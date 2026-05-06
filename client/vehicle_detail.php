@@ -1,96 +1,95 @@
-﻿<?php
-// client/vehicle_detail.php
-require_once __DIR__ . '/../includes/header.php';
-requireRole('client');
+<?php
+require_once '../config/database.php';
+require_once '../includes/functions.php';
 
-$id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
-if (!$id) {
-    setFlashMessage("VÃ©hicule introuvable.", "error");
-    header("Location: /Projet_Auto/client/vehicles.php");
-    exit();
+if (!isset($_GET['id']) || empty($_GET['id'])) {
+    redirect('/client/vehicles.php');
 }
 
-$stmt = $pdo->prepare("SELECT * FROM vehicles WHERE id = ? AND deleted_at IS NULL AND statut != 'maintenance'");
-$stmt->execute([$id]);
+$id = (int)$_GET['id'];
+$stmt = $pdo->prepare("SELECT * FROM vehicules WHERE id = :id");
+$stmt->execute([':id' => $id]);
 $vehicle = $stmt->fetch();
 
 if (!$vehicle) {
-    setFlashMessage("VÃ©hicule introuvable ou indisponible.", "error");
-    header("Location: /Projet_Auto/client/vehicles.php");
-    exit();
+    setFlash('error', "Véhicule non trouvé.");
+    redirect('/client/vehicles.php');
 }
-?>
 
-<div class="d-flex" style="max-width: 1200px; margin: 0 auto; gap: 2rem;">
-    <?php include __DIR__ . '/../includes/sidebar_client.php'; ?>
+$pageTitle = $vehicle['marque'] . ' ' . $vehicle['modele'];
+?>
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><?= $pageTitle ?> - AutoPartage</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body class="dashboard">
+    <?php include '../includes/sidebar.php'; ?>
     
-    <div style="flex: 1; padding: 2rem 0;">
-        <a href="/Projet_Auto/client/vehicles.php" style="display: inline-block; margin-bottom: 1rem; color: var(--gray-500);"><i class="fa fa-arrow-left"></i> Retour</a>
-        
-        <div class="d-flex" style="gap: 2rem;">
-            <div style="flex: 2;">
-                <div class="card" style="margin-bottom: 2rem;">
-                    <div style="height: 400px; background-color: var(--gray-100); display: flex; align-items: center; justify-content: center; overflow: hidden;">
-                        <?php if($vehicle['image']): ?>
-                            <img src="/Projet_Auto/assets/images/<?php echo htmlspecialchars($vehicle['image']); ?>" alt="Voiture" style="width: 100%; height: 100%; object-fit: cover;">
-                        <?php else: ?>
-                            <i class="fa fa-car" style="font-size: 8rem; color: var(--gray-300);"></i>
-                        <?php endif; ?>
-                    </div>
-                </div>
-                
-                <div class="card">
-                    <div class="card-body">
-                        <h3 class="mb-3">Description</h3>
-                        <p style="color: var(--gray-700); line-height: 1.6; white-space: pre-line;">
-                            <?php echo htmlspecialchars($vehicle['description'] ?? 'Aucune description disponible pour ce vÃ©hicule.'); ?>
-                        </p>
-                    </div>
-                </div>
+    <main class="dashboard-content">
+        <header class="dashboard-header">
+            <a href="vehicles.php" class="back-link">&larr; Retour aux véhicules</a>
+            <div class="user-info">
+                 <button class="btn btn-outline btn-sm"><i class="far fa-heart"></i></button>
             </div>
-            
-            <div style="flex: 1;">
-                <div class="card" style="position: sticky; top: 100px;">
-                    <div class="card-body">
-                        <h2 style="font-size: 1.5rem; margin-bottom: 0.5rem;"><?php echo htmlspecialchars($vehicle['marque'] . ' ' . $vehicle['modele']); ?></h2>
-                        <p style="color: var(--success); font-weight: 600; margin-bottom: 1.5rem;"><i class="fa fa-check-circle"></i> Disponible</p>
-                        
-                        <ul style="list-style: none; display: flex; flex-direction: column; gap: 1rem; margin-bottom: 2rem;">
-                            <li class="d-flex align-items-center" style="gap: 1rem; color: var(--gray-700);">
-                                <i class="fa-solid fa-bolt" style="width: 20px; text-align: center; color: var(--gray-500);"></i> 
-                                <?php echo htmlspecialchars($vehicle['carburant']); ?>
-                            </li>
-                            <li class="d-flex align-items-center" style="gap: 1rem; color: var(--gray-700);">
-                                <i class="fa-regular fa-calendar-alt" style="width: 20px; text-align: center; color: var(--gray-500);"></i> 
-                                <?php echo htmlspecialchars($vehicle['annee']); ?>
-                            </li>
-                            <li class="d-flex align-items-center" style="gap: 1rem; color: var(--gray-700);">
-                                <i class="fa-solid fa-cogs" style="width: 20px; text-align: center; color: var(--gray-500);"></i> 
-                                <?php echo htmlspecialchars($vehicle['transmission']); ?>
-                            </li>
-                            <li class="d-flex align-items-center" style="gap: 1rem; color: var(--gray-700);">
-                                <i class="fa-solid fa-users" style="width: 20px; text-align: center; color: var(--gray-500);"></i> 
-                                <?php echo htmlspecialchars($vehicle['places']); ?> places
-                            </li>
-                            <li class="d-flex align-items-center" style="gap: 1rem; color: var(--gray-700);">
-                                <i class="fa-solid fa-snowflake" style="width: 20px; text-align: center; color: var(--gray-500);"></i> 
-                                <?php echo $vehicle['climatisation'] ? 'Climatisation' : 'Sans climatisation'; ?>
-                            </li>
-                        </ul>
-                        
-                        <div style="border-top: 1px solid var(--gray-200); padding-top: 1.5rem; margin-bottom: 1.5rem;">
-                            <div style="font-size: 1.5rem; font-weight: 700;">
-                                <?php echo formatPrice($vehicle['prix_jour']); ?> <span style="font-size: 1rem; font-weight: 400; color: var(--gray-500);">/ jour</span>
-                            </div>
+        </header>
+
+        <div class="detail-page">
+            <div class="detail-grid">
+                <div class="detail-image">
+                    <img src="<?= getVehiculeImage($vehicle['image']) ?>" alt="<?= clean($vehicle['marque'] . ' ' . $vehicle['modele']) ?>">
+                    <div class="grid-4 mt-2">
+                        <img src="<?= getVehiculeImage($vehicle['image']) ?>" style="height: 80px; object-fit: cover; border-radius: 4px;">
+                        <img src="<?= getVehiculeImage($vehicle['image']) ?>" style="height: 80px; object-fit: cover; border-radius: 4px; opacity: 0.6;">
+                        <img src="<?= getVehiculeImage($vehicle['image']) ?>" style="height: 80px; object-fit: cover; border-radius: 4px; opacity: 0.6;">
+                        <div style="height: 80px; background: #eee; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem;">+</div>
+                    </div>
+                </div>
+                <div class="detail-info">
+                    <div class="flex-between mb-2">
+                        <h1><?= clean($vehicle['marque'] . ' ' . $vehicle['modele']) ?></h1>
+                        <?= getVehiculeStatutBadge($vehicle['statut']) ?>
+                    </div>
+                    
+                    <div class="detail-specs">
+                        <div class="spec-tag"><i class="fas fa-bolt"></i> <?= clean($vehicle['type_carburant']) ?></div>
+                        <div class="spec-tag"><i class="fas fa-calendar-alt"></i> <?= $vehicle['annee'] ?></div>
+                        <div class="spec-tag"><i class="fas fa-cogs"></i> <?= clean($vehicle['transmission']) ?></div>
+                        <div class="spec-tag"><i class="fas fa-users"></i> <?= $vehicle['nombre_places'] ?> places</div>
+                        <div class="spec-tag"><i class="fas fa-snowflake"></i> Climatisation</div>
+                    </div>
+
+                    <div class="detail-price">
+                        <?= formatPrix($vehicle['prix_jour']) ?> <span>/ jour</span>
+                    </div>
+
+                    <p class="mb-4" style="color: var(--secondary);"><?= nl2br(clean($vehicle['description'])) ?></p>
+
+                    <?php if ($vehicle['statut'] === 'disponible'): ?>
+                        <a href="reserve.php?id=<?= $vehicle['id'] ?>" class="btn btn-primary btn-lg btn-block">Réserver maintenant</a>
+                    <?php else: ?>
+                        <button class="btn btn-primary btn-lg btn-block" disabled>Indisponible actuellement</button>
+                    <?php endif; ?>
+
+                    <div class="detail-tabs">
+                        <div class="tabs-header">
+                            <button class="tab-btn active">Description</button>
+                            <button class="tab-btn">Caractéristiques</button>
+                            <button class="tab-btn">Conditions</button>
                         </div>
-                        
-                        <a href="/Projet_Auto/client/reserve.php?id=<?php echo $vehicle['id']; ?>" class="btn btn-primary btn-block text-center" style="padding: 1rem;">RÃ©server maintenant</a>
+                        <div class="tab-content">
+                            <?= nl2br(clean($vehicle['caracteristiques'])) ?>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
-    </div>
-</div>
-
-<?php require_once __DIR__ . '/../includes/footer.php'; ?>
-
+    </main>
+</body>
+</html>

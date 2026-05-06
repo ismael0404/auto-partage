@@ -1,164 +1,135 @@
-﻿<?php
-// admin/reservations.php
-require_once __DIR__ . '/../includes/header.php';
-requireRole('admin');
+<?php
+require_once '../config/database.php';
+require_once '../includes/functions.php';
 
-// Actions sur la rÃ©servation
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'], $_POST['reservation_id'])) {
+requireAdmin();
+
+// Actions sur les réservations
+if (isset($_POST['action']) && isset($_POST['id'])) {
+    $id = (int)$_POST['id'];
     $action = $_POST['action'];
-    $resa_id = filter_input(INPUT_POST, 'reservation_id', FILTER_VALIDATE_INT);
-    
-    if ($resa_id) {
-        $stmt = $pdo->prepare("SELECT * FROM reservations WHERE id = ?");
-        $stmt->execute([$resa_id]);
-        $resa = $stmt->fetch();
+    $newStatut = '';
+
+    if ($action === 'confirm') $newStatut = 'confirmee';
+    elseif ($action === 'cancel') $newStatut = 'annulee';
+    elseif ($action === 'finish') $newStatut = 'terminee';
+
+    if ($newStatut) {
+        $stmt = $pdo->prepare("UPDATE reservations SET statut = :st WHERE id = :id");
+        $stmt->execute([':st' => $newStatut, ':id' => $id]);
         
-        if ($resa) {
-            try {
-                $pdo->beginTransaction();
-                
-                if ($action === 'confirm' && $resa['statut'] === 'en_attente') {
-                    // Confirmer
-                    $update = $pdo->prepare("UPDATE reservations SET statut = 'confirmee' WHERE id = ?");
-                    $update->execute([$resa_id]);
-                    // Mettre le vÃ©hicule en statut 'reserve' (comme demandÃ©)
-                    $updateVeh = $pdo->prepare("UPDATE vehicles SET statut = 'reserve' WHERE id = ?");
-                    $updateVeh->execute([$resa['vehicle_id']]);
-                    
-                    setFlashMessage("RÃ©servation confirmÃ©e avec succÃ¨s.", "success");
-                } 
-                elseif ($action === 'cancel' && in_array($resa['statut'], ['en_attente', 'confirmee', 'en_cours'])) {
-                    // Annuler
-                    $update = $pdo->prepare("UPDATE reservations SET statut = 'annulee' WHERE id = ?");
-                    $update->execute([$resa_id]);
-                    // Remettre le vÃ©hicule disponible
-                    $updateVeh = $pdo->prepare("UPDATE vehicles SET statut = 'disponible' WHERE id = ?");
-                    $updateVeh->execute([$resa['vehicle_id']]);
-                    
-                    setFlashMessage("RÃ©servation annulÃ©e.", "info");
-                }
-                elseif ($action === 'finish' && in_array($resa['statut'], ['confirmee', 'en_cours'])) {
-                    // Terminer
-                    $update = $pdo->prepare("UPDATE reservations SET statut = 'terminee' WHERE id = ?");
-                    $update->execute([$resa_id]);
-                    // Remettre le vÃ©hicule disponible
-                    $updateVeh = $pdo->prepare("UPDATE vehicles SET statut = 'disponible' WHERE id = ?");
-                    $updateVeh->execute([$resa['vehicle_id']]);
-                    
-                    setFlashMessage("RÃ©servation marquÃ©e comme terminÃ©e.", "success");
-                }
-                
-                $pdo->commit();
-            } catch (Exception $e) {
-                $pdo->rollBack();
-                setFlashMessage("Erreur lors de la mise Ã  jour.", "error");
-            }
+        // Récupérer les infos pour notification et mise à jour véhicule
+        $stmtRes = $pdo->prepare("SELECT r.utilisateur_id, r.vehicule_id, v.marque, v.modele FROM reservations r JOIN vehicules v ON r.vehicule_id = v.id WHERE r.id = :id");
+        $stmtRes->execute([':id' => $id]);
+        $resData = $stmtRes->fetch();
+
+        // Mettre à jour le statut du véhicule
+        if ($newStatut === 'confirmee') {
+            $stmtVeh = $pdo->prepare("UPDATE vehicules SET statut = 'reserve' WHERE id = :vid");
+            $stmtVeh->execute([':vid' => $resData['vehicule_id']]);
+        } elseif ($newStatut === 'terminee' || $newStatut === 'annulee') {
+            // Vérifier s'il n'y a pas d'autres réservations confirmées en cours pour ce véhicule
+            $stmtVeh = $pdo->prepare("UPDATE vehicules SET statut = 'disponible' WHERE id = :vid");
+            $stmtVeh->execute([':vid' => $resData['vehicule_id']]);
         }
+        
+        $msgTitre = "Mise à jour de votre réservation";
+        $msgContenu = "Votre réservation pour le véhicule " . $resData['marque'] . " " . $resData['modele'] . " est passée au statut : " . $newStatut . ".";
+        
+        $stmtMsg = $pdo->prepare("INSERT INTO messages (utilisateur_id, titre, contenu, type) VALUES (:uid, :titre, :cont, :tp)");
+        $stmtMsg->execute([
+            ':uid' => $resData['utilisateur_id'],
+            ':titre' => $msgTitre,
+            ':cont' => $msgContenu,
+            ':tp' => ($newStatut === 'confirmee' ? 'success' : ($newStatut === 'annulee' ? 'error' : 'info'))
+        ]);
+
+        setFlash('success', "Réservation mise à jour avec succès.");
     }
-    header("Location: /Projet_Auto/admin/reservations.php");
-    exit();
+    redirect('/admin/reservations.php');
 }
 
-$stmt = $pdo->query("
-    SELECT r.*, u.prenom, u.nom, u.email, v.marque, v.modele 
-    FROM reservations r 
-    JOIN users u ON r.user_id = u.id 
-    JOIN vehicles v ON r.vehicle_id = v.id 
-    WHERE r.deleted_at IS NULL
-    ORDER BY r.created_at DESC
-");
+$stmt = $pdo->query("SELECT r.*, v.marque, v.modele, u.prenom, u.nom, u.email 
+                     FROM reservations r 
+                     JOIN vehicules v ON r.vehicule_id = v.id 
+                     JOIN utilisateurs u ON r.utilisateur_id = u.id 
+                     ORDER BY r.date_creation DESC");
 $reservations = $stmt->fetchAll();
+
+$pageTitle = "Gestion des réservations";
 ?>
-
-<div class="d-flex" style="max-width: 1200px; margin: 0 auto; gap: 2rem;">
-    <?php include __DIR__ . '/../includes/sidebar_admin.php'; ?>
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><?= $pageTitle ?> - AutoPartage</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body class="dashboard">
+    <?php include '../includes/sidebar.php'; ?>
     
-    <div style="flex: 1; padding: 2rem 0;">
-        <h2 class="mb-4">Gestion des rÃ©servations</h2>
-        
-        <div class="card">
-            <div class="card-body">
-                <?php if(empty($reservations)): ?>
-                    <p class="text-center" style="color: var(--gray-500);">Aucune rÃ©servation.</p>
-                <?php else: ?>
-                    <div style="overflow-x: auto;">
-                        <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9rem;">
-                            <thead>
-                                <tr style="border-bottom: 2px solid var(--gray-200);">
-                                    <th style="padding: 1rem;">Client</th>
-                                    <th style="padding: 1rem;">VÃ©hicule</th>
-                                    <th style="padding: 1rem;">PÃ©riode</th>
-                                    <th style="padding: 1rem;">Statut</th>
-                                    <th style="padding: 1rem; text-align: right;">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php foreach($reservations as $r): ?>
-                                <tr style="border-bottom: 1px solid var(--gray-200);">
-                                    <td style="padding: 1rem;">
-                                        <div style="font-weight: 500;"><?php echo htmlspecialchars($r['prenom'] . ' ' . $r['nom']); ?></div>
-                                        <div style="color: var(--gray-500); font-size: 0.8rem;"><?php echo htmlspecialchars($r['email']); ?></div>
-                                    </td>
-                                    <td style="padding: 1rem; font-weight: 500;">
-                                        <?php echo htmlspecialchars($r['marque'] . ' ' . $r['modele']); ?>
-                                    </td>
-                                    <td style="padding: 1rem;">
-                                        <?php echo date('d/m/Y H:i', strtotime($r['date_debut'])); ?> au<br>
-                                        <?php echo date('d/m/Y H:i', strtotime($r['date_fin'])); ?>
-                                    </td>
-                                    <td style="padding: 1rem;">
-                                        <span style="padding: 0.25rem 0.5rem; border-radius: 999px; font-size: 0.8rem; font-weight: 600;
-                                            <?php 
-                                            echo match($r['statut']) {
-                                                'en_attente' => 'background-color: #fef3c7; color: #92400e;',
-                                                'confirmee' => 'background-color: #d1fae5; color: #065f46;',
-                                                'en_cours' => 'background-color: #dbeafe; color: #1e40af;',
-                                                'terminee' => 'background-color: #f3f4f6; color: #374151;',
-                                                'annulee' => 'background-color: #fee2e2; color: #991b1b;',
-                                                default => 'background-color: var(--gray-200); color: var(--gray-700);'
-                                            };
-                                            ?>
-                                        ">
-                                            <?php echo ucfirst(str_replace('_', ' ', $r['statut'])); ?>
-                                        </span>
-                                    </td>
-                                    <td style="padding: 1rem; text-align: right;">
-                                        <div class="d-flex" style="justify-content: flex-end; gap: 0.5rem;">
-                                            <?php if($r['statut'] === 'en_attente'): ?>
-                                                <form method="POST" style="display: inline;">
-                                                    <input type="hidden" name="reservation_id" value="<?php echo $r['id']; ?>">
-                                                    <input type="hidden" name="action" value="confirm">
-                                                    <button type="submit" class="btn btn-outline" style="padding: 0.25rem 0.5rem; font-size: 0.8rem; border-color: var(--success); color: var(--success);"><i class="fa fa-check"></i></button>
-                                                </form>
-                                            <?php endif; ?>
-                                            
-                                            <?php if(in_array($r['statut'], ['en_attente', 'confirmee', 'en_cours'])): ?>
-                                                <form method="POST" onsubmit="return confirm('Annuler cette rÃ©servation ?');" style="display: inline;">
-                                                    <input type="hidden" name="reservation_id" value="<?php echo $r['id']; ?>">
-                                                    <input type="hidden" name="action" value="cancel">
-                                                    <button type="submit" class="btn btn-outline" style="padding: 0.25rem 0.5rem; font-size: 0.8rem; border-color: var(--error); color: var(--error);"><i class="fa fa-times"></i></button>
-                                                </form>
-                                            <?php endif; ?>
+    <main class="dashboard-content">
+        <header class="dashboard-header">
+            <h1>Gestion des réservations</h1>
+        </header>
 
-                                            <?php if(in_array($r['statut'], ['confirmee', 'en_cours'])): ?>
-                                                <form method="POST" onsubmit="return confirm('Marquer comme terminÃ©e ?');" style="display: inline;">
-                                                    <input type="hidden" name="reservation_id" value="<?php echo $r['id']; ?>">
-                                                    <input type="hidden" name="action" value="finish">
-                                                    <button type="submit" class="btn btn-outline" style="padding: 0.25rem 0.5rem; font-size: 0.8rem; background-color: var(--gray-200);"><i class="fa fa-flag-checkered"></i></button>
-                                                </form>
-                                            <?php endif; ?>
-                                        </div>
-                                    </td>
-                                </tr>
-                                <?php endforeach; ?>
-                            </tbody>
-                        </table>
-                    </div>
-                <?php endif; ?>
-            </div>
+        <?php $flash = getFlash(); if ($flash): ?>
+            <div class="flash flash-<?= $flash['type'] ?>"><?= $flash['message'] ?></div>
+        <?php endif; ?>
+
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Client</th>
+                        <th>Véhicule</th>
+                        <th>Période</th>
+                        <th>Total</th>
+                        <th>Statut</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php if (empty($reservations)): ?>
+                        <tr><td colspan="6" class="text-center">Aucune réservation.</td></tr>
+                    <?php else: ?>
+                        <?php foreach ($reservations as $res): ?>
+                        <tr>
+                            <td>
+                                <strong><?= clean($res['prenom'] . ' ' . $res['nom']) ?></strong><br>
+                                <span style="font-size: 0.8rem; color: var(--secondary);"><?= clean($res['email']) ?></span>
+                            </td>
+                            <td><?= clean($res['marque'] . ' ' . $res['modele']) ?></td>
+                            <td>
+                                <?= formatDate($res['date_debut']) ?> - <?= formatDate($res['date_fin']) ?><br>
+                                <span style="font-size: 0.8rem; color: var(--secondary);"><?= $res['duree_jours'] ?> jour(s)</span>
+                            </td>
+                            <td><strong><?= formatPrix($res['prix_total']) ?></strong></td>
+                            <td><?= getStatutBadge($res['statut']) ?></td>
+                            <td>
+                                <form action="reservations.php" method="POST" class="flex gap-1">
+                                    <input type="hidden" name="id" value="<?= $res['id'] ?>">
+                                    <?php if ($res['statut'] === 'en_attente'): ?>
+                                        <button type="submit" name="action" value="confirm" class="btn btn-success btn-sm">Confirmer</button>
+                                        <button type="submit" name="action" value="cancel" class="btn btn-danger btn-sm">Annuler</button>
+                                    <?php elseif ($res['statut'] === 'confirmee'): ?>
+                                        <button type="submit" name="action" value="finish" class="btn btn-primary btn-sm">Terminer</button>
+                                        <button type="submit" name="action" value="cancel" class="btn btn-danger btn-sm">Annuler</button>
+                                    <?php else: ?>
+                                        <button class="btn btn-outline btn-sm" disabled>Aucune action</button>
+                                    <?php endif; ?>
+                                </form>
+                            </td>
+                        </tr>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
+                </tbody>
+            </table>
         </div>
-    </div>
-</div>
-
-<?php require_once __DIR__ . '/../includes/footer.php'; ?>
-
+    </main>
+</body>
+</html>

@@ -1,95 +1,101 @@
-﻿<?php
-// client/vehicles.php
-require_once __DIR__ . '/../includes/header.php';
-requireRole('client');
+<?php
+require_once '../config/database.php';
+require_once '../includes/functions.php';
 
 // Filtres
-$carburant = $_GET['carburant'] ?? '';
-$prix_max = $_GET['prix_max'] ?? '';
-
-// RequÃªte de base (seulement les vÃ©hicules non supprimÃ©s et non en maintenance)
-$query = "SELECT * FROM vehicles WHERE deleted_at IS NULL AND statut != 'maintenance'";
+$where = " WHERE 1=1";
 $params = [];
 
-if (!empty($carburant)) {
-    $query .= " AND carburant = ?";
-    $params[] = $carburant;
+if (isset($_GET['search']) && !empty($_GET['search'])) {
+    $where .= " AND (marque LIKE :search OR modele LIKE :search)";
+    $params[':search'] = '%' . $_GET['search'] . '%';
 }
 
-if (!empty($prix_max)) {
-    $query .= " AND prix_jour <= ?";
-    $params[] = $prix_max;
+if (isset($_GET['carburant']) && !empty($_GET['carburant'])) {
+    $where .= " AND type_carburant = :carburant";
+    $params[':carburant'] = $_GET['carburant'];
 }
 
-$query .= " ORDER BY prix_jour ASC";
+if (isset($_GET['prix_max']) && !empty($_GET['prix_max'])) {
+    $where .= " AND prix_jour <= :prix_max";
+    $params[':prix_max'] = $_GET['prix_max'];
+}
 
-$stmt = $pdo->prepare($query);
+// Seulement les véhicules disponibles ou réservés (mais pas en maintenance pour les clients)
+$where .= " AND statut != 'maintenance' AND is_deleted = 0";
+
+$sql = "SELECT * FROM vehicules" . $where . " ORDER BY date_creation DESC";
+$stmt = $pdo->prepare($sql);
 $stmt->execute($params);
 $vehicles = $stmt->fetchAll();
-?>
 
-<div class="d-flex" style="max-width: 1200px; margin: 0 auto; gap: 2rem;">
-    <?php include __DIR__ . '/../includes/sidebar_client.php'; ?>
+$pageTitle = "Véhicules disponibles";
+?>
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><?= $pageTitle ?> - AutoPartage</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body class="dashboard">
+    <?php include '../includes/sidebar.php'; ?>
     
-    <div style="flex: 1; padding: 2rem 0;">
-        <div class="d-flex justify-content-between align-items-center mb-4">
-            <h2>Nos vÃ©hicules disponibles</h2>
-        </div>
-        
-        <!-- Filtres -->
-        <form method="GET" class="card mb-4">
-            <div class="card-body d-flex" style="gap: 1rem; align-items: flex-end;">
-                <div class="form-group mb-0" style="flex: 1;">
-                    <label class="form-label">Type de carburant</label>
-                    <select name="carburant" class="form-control">
-                        <option value="">Tous</option>
-                        <option value="Essence" <?php echo $carburant === 'Essence' ? 'selected' : ''; ?>>Essence</option>
-                        <option value="Diesel" <?php echo $carburant === 'Diesel' ? 'selected' : ''; ?>>Diesel</option>
-                        <option value="Electrique" <?php echo $carburant === 'Electrique' ? 'selected' : ''; ?>>Ã‰lectrique</option>
-                        <option value="Hybride" <?php echo $carburant === 'Hybride' ? 'selected' : ''; ?>>Hybride</option>
-                    </select>
-                </div>
-                <div class="form-group mb-0" style="flex: 1;">
-                    <label class="form-label">Prix max. (FCFA/jour)</label>
-                    <input type="number" name="prix_max" class="form-control" placeholder="Ex: 50000" value="<?php echo htmlspecialchars($prix_max); ?>">
-                </div>
-                <button type="submit" class="btn btn-primary" style="height: 45px;">Filtrer</button>
-                <a href="/Projet_Auto/client/vehicles.php" class="btn btn-outline" style="height: 45px; display: flex; align-items: center;">RÃ©initialiser</a>
+    <main class="dashboard-content">
+        <header class="dashboard-header">
+            <h1>Nos véhicules disponibles</h1>
+            <div class="user-info flex gap-2">
+                <?php if (isLoggedIn()): ?>
+                    <span>Bonjour, <strong><?= $_SESSION['user_prenom'] ?></strong></span>
+                <?php else: ?>
+                    <a href="../auth/login.php" class="btn btn-outline btn-sm">Se connecter</a>
+                <?php endif; ?>
             </div>
+        </header>
+
+        <?php $flash = getFlash(); if ($flash): ?>
+            <div class="flash flash-<?= $flash['type'] ?>"><?= $flash['message'] ?></div>
+        <?php endif; ?>
+
+        <form action="vehicles.php" method="GET" class="filters">
+            <div class="search-box">
+                <input type="text" name="search" placeholder="Rechercher un véhicule..." value="<?= isset($_GET['search']) ? clean($_GET['search']) : '' ?>">
+            </div>
+            <select name="carburant" class="form-control" style="width: auto;">
+                <option value="">Type de carburant</option>
+                <option value="Essence" <?= isset($_GET['carburant']) && $_GET['carburant'] === 'Essence' ? 'selected' : '' ?>>Essence</option>
+                <option value="Diesel" <?= isset($_GET['carburant']) && $_GET['carburant'] === 'Diesel' ? 'selected' : '' ?>>Diesel</option>
+                <option value="Électrique" <?= isset($_GET['carburant']) && $_GET['carburant'] === 'Électrique' ? 'selected' : '' ?>>Électrique</option>
+                <option value="Hybride" <?= isset($_GET['carburant']) && $_GET['carburant'] === 'Hybride' ? 'selected' : '' ?>>Hybride</option>
+            </select>
+            <input type="number" name="prix_max" placeholder="Prix max / jour" class="form-control" style="width: auto;" value="<?= isset($_GET['prix_max']) ? clean($_GET['prix_max']) : '' ?>">
+            <button type="submit" class="btn btn-primary">Filtrer</button>
+            <a href="vehicles.php" class="btn btn-outline">Réinitialiser</a>
         </form>
-        
-        <!-- Liste des vÃ©hicules -->
-        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1.5rem;">
-            <?php if(empty($vehicles)): ?>
-                <p>Aucun vÃ©hicule ne correspond Ã  vos critÃ¨res.</p>
-            <?php endif; ?>
-            
-            <?php foreach($vehicles as $v): ?>
-            <div class="card">
-                <div style="height: 200px; background-color: var(--gray-100); display: flex; align-items: center; justify-content: center; overflow: hidden;">
-                    <?php if($v['image']): ?>
-                        <img src="/Projet_Auto/assets/images/<?php echo htmlspecialchars($v['image']); ?>" alt="Voiture" style="width: 100%; height: 100%; object-fit: cover;">
-                    <?php else: ?>
-                        <i class="fa fa-car" style="font-size: 4rem; color: var(--gray-300);"></i>
-                    <?php endif; ?>
-                </div>
-                <div class="card-body">
-                    <h3 style="font-size: 1.25rem; margin-bottom: 0.5rem;"><?php echo htmlspecialchars($v['marque'] . ' ' . $v['modele']); ?></h3>
-                    <p style="color: var(--gray-500); font-size: 0.875rem; margin-bottom: 1rem;">
-                        <?php echo htmlspecialchars($v['carburant']); ?> &bull; <?php echo htmlspecialchars($v['transmission']); ?>
-                    </p>
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <span style="font-weight: 700; font-size: 1.125rem;"><?php echo formatPrice($v['prix_jour']); ?></span> <span style="color: var(--gray-500); font-size: 0.875rem;">/ jour</span>
+
+        <div class="grid-3">
+            <?php if (empty($vehicles)): ?>
+                <p>Aucun véhicule ne correspond à votre recherche.</p>
+            <?php else: ?>
+                <?php foreach ($vehicles as $vehicle): ?>
+                <div class="vehicle-card">
+                    <img src="<?= getVehiculeImage($vehicle['image']) ?>" alt="<?= clean($vehicle['marque'] . ' ' . $vehicle['modele']) ?>" class="vehicle-card-img">
+                    <div class="vehicle-card-body">
+                        <div class="flex-between mb-1">
+                            <p class="type"><?= clean($vehicle['type_carburant']) ?></p>
+                            <?= getVehiculeStatutBadge($vehicle['statut']) ?>
                         </div>
-                        <a href="/Projet_Auto/client/vehicle_detail.php?id=<?php echo $v['id']; ?>" class="btn btn-outline" style="padding: 0.25rem 0.75rem; font-size: 0.875rem;">Voir dÃ©tails</a>
+                        <h3><?= clean($vehicle['marque'] . ' ' . $vehicle['modele']) ?></h3>
+                        <p class="price"><?= formatPrix($vehicle['prix_jour']) ?> <span>/ jour</span></p>
+                        <a href="vehicle_detail.php?id=<?= $vehicle['id'] ?>" class="btn btn-primary btn-sm btn-block mt-2">Voir détails</a>
                     </div>
                 </div>
-            </div>
-            <?php endforeach; ?>
+                <?php endforeach; ?>
+            <?php endif; ?>
         </div>
-    </div>
-</div>
-
-<?php require_once __DIR__ . '/../includes/footer.php'; ?>
-
+    </main>
+</body>
+</html>

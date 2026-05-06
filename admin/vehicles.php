@@ -1,99 +1,263 @@
-﻿<?php
-// admin/vehicles.php
-require_once __DIR__ . '/../includes/header.php';
-requireRole('admin');
+<?php
+require_once '../config/database.php';
+require_once '../includes/functions.php';
 
-// Soft delete
-if (isset($_POST['delete_id'])) {
-    $delete_id = filter_input(INPUT_POST, 'delete_id', FILTER_VALIDATE_INT);
-    if ($delete_id) {
-        $stmt = $pdo->prepare("UPDATE vehicles SET deleted_at = NOW() WHERE id = ?");
-        $stmt->execute([$delete_id]);
-        setFlashMessage("VÃ©hicule supprimÃ© avec succÃ¨s.", "success");
-        header("Location: /Projet_Auto/admin/vehicles.php");
-        exit();
+requireAdmin();
+
+$error = '';
+$success = '';
+
+// Suppression (Soft Delete)
+if (isset($_GET['delete'])) {
+    $deleteId = (int)$_GET['delete'];
+    $stmt = $pdo->prepare("UPDATE vehicules SET is_deleted = 1 WHERE id = :id");
+    $stmt->execute([':id' => $deleteId]);
+    setFlash('success', "Véhicule supprimé avec succès (archivé).");
+    redirect('/admin/vehicles.php');
+}
+
+// Ajout / Modification
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $marque = clean($_POST['marque']);
+    $modele = clean($_POST['modele']);
+    $annee = (int)$_POST['annee'];
+    $type_carburant = $_POST['type_carburant'];
+    $transmission = $_POST['transmission'];
+    $nombre_places = (int)$_POST['nombre_places'];
+    $prix_jour = (float)$_POST['prix_jour'];
+    $statut = $_POST['statut'];
+    $description = clean($_POST['description']);
+    $caracteristiques = clean($_POST['caracteristiques']);
+    $image_name = isset($_POST['old_image']) ? $_POST['old_image'] : '';
+
+    // Gestion de l'upload d'image
+    if (isset($_FILES['image']) && $_FILES['image']['error'] === 0) {
+        $allowed = ['jpg', 'jpeg', 'png', 'webp', 'jfif'];
+        $filename = $_FILES['image']['name'];
+        $filetype = pathinfo($filename, PATHINFO_EXTENSION);
+        $filesize = $_FILES['image']['size'];
+
+        if (!in_array(strtolower($filetype), $allowed)) {
+            $error = "Format d'image non autorisé (JPG, PNG, WEBP, JFIF uniquement).";
+        } elseif ($filesize > 5 * 1024 * 1024) { // 5MB
+            $error = "L'image est trop lourde (max 5Mo).";
+        } else {
+            $new_name = uniqid('veh_') . '.' . $filetype;
+            $upload_path = '../assets/images/vehicules/' . $new_name;
+            
+            if (move_uploaded_file($_FILES['image']['tmp_name'], $upload_path)) {
+                $image_name = $new_name;
+            } else {
+                $error = "Erreur lors de l'upload de l'image.";
+            }
+        }
+    }
+
+    if (!$error) {
+        if (isset($_POST['id']) && !empty($_POST['id'])) {
+            // Update
+            $stmt = $pdo->prepare("UPDATE vehicules SET marque=:mq, modele=:md, annee=:an, type_carburant=:tc, transmission=:tr, nombre_places=:np, prix_jour=:pj, statut=:st, description=:ds, caracteristiques=:ct, image=:img WHERE id=:id");
+            $stmt->execute([
+                ':mq' => $marque, ':md' => $modele, ':an' => $annee, ':tc' => $type_carburant, ':tr' => $transmission, ':np' => $nombre_places, ':pj' => $prix_jour, ':st' => $statut, ':ds' => $description, ':ct' => $caracteristiques, ':img' => $image_name, ':id' => $_POST['id']
+            ]);
+            setFlash('success', "Véhicule mis à jour avec succès.");
+        } else {
+            // Insert
+            $stmt = $pdo->prepare("INSERT INTO vehicules (marque, modele, annee, type_carburant, transmission, nombre_places, prix_jour, statut, description, caracteristiques, image) VALUES (:mq, :md, :an, :tc, :tr, :np, :pj, :st, :ds, :ct, :img)");
+            $stmt->execute([
+                ':mq' => $marque, ':md' => $modele, ':an' => $annee, ':tc' => $type_carburant, ':tr' => $transmission, ':np' => $nombre_places, ':pj' => $prix_jour, ':st' => $statut, ':ds' => $description, ':ct' => $caracteristiques, ':img' => $image_name
+            ]);
+            setFlash('success', "Véhicule ajouté avec succès.");
+        }
+        redirect('/admin/vehicles.php');
     }
 }
 
-$stmt = $pdo->query("SELECT * FROM vehicles WHERE deleted_at IS NULL ORDER BY created_at DESC");
+$stmt = $pdo->query("SELECT * FROM vehicules WHERE is_deleted = 0 ORDER BY date_creation DESC");
 $vehicles = $stmt->fetchAll();
-?>
 
-<div class="d-flex" style="max-width: 1200px; margin: 0 auto; gap: 2rem;">
-    <?php include __DIR__ . '/../includes/sidebar_admin.php'; ?>
+$pageTitle = "Gestion des véhicules";
+?>
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><?= $pageTitle ?> - AutoPartage</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body class="dashboard">
+    <?php include '../includes/sidebar.php'; ?>
     
-    <div style="flex: 1; padding: 2rem 0;">
-        <div class="d-flex justify-content-between align-items-center mb-4">
-            <h2>Gestion des vÃ©hicules</h2>
-            <a href="/Projet_Auto/admin/vehicle_add.php" class="btn btn-primary"><i class="fa fa-plus"></i> Ajouter un vÃ©hicule</a>
+    <main class="dashboard-content">
+        <header class="dashboard-header">
+            <h1>Gestion des véhicules</h1>
+            <button class="btn btn-primary" onclick="openModal()">Ajouter un véhicule</button>
+        </header>
+
+        <?php $flash = getFlash(); if ($flash): ?>
+            <div class="flash flash-<?= $flash['type'] ?>"><?= $flash['message'] ?></div>
+        <?php endif; ?>
+
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Véhicule</th>
+                        <th>Type</th>
+                        <th>Prix / Jour</th>
+                        <th>Places</th>
+                        <th>Statut</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($vehicles as $v): ?>
+                    <tr>
+                        <td>
+                            <div class="flex gap-1">
+                                <img src="<?= getVehiculeImage($v['image']) ?>" alt="" style="width: 50px; height: 35px; object-fit: cover; border-radius: 4px;">
+                                <strong><?= clean($v['marque'] . ' ' . $v['modele']) ?></strong>
+                            </div>
+                        </td>
+                        <td><?= clean($v['type_carburant']) ?> / <?= clean($v['transmission']) ?></td>
+                        <td><?= formatPrix($v['prix_jour']) ?></td>
+                        <td><?= $v['nombre_places'] ?></td>
+                        <td><?= getVehiculeStatutBadge($v['statut']) ?></td>
+                        <td>
+                            <div class="flex gap-1">
+                                <button class="btn btn-outline btn-sm" onclick='editVehicle(<?= json_encode($v) ?>)'>Éditer</button>
+                                <a href="vehicles.php?delete=<?= $v['id'] ?>" class="btn btn-danger btn-sm" onclick="return confirm('Supprimer ce véhicule ?')">Supprimer</a>
+                            </div>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
         </div>
-        
-        <div class="card">
-            <div class="card-body">
-                <?php if(empty($vehicles)): ?>
-                    <p class="text-center" style="color: var(--gray-500);">Aucun vÃ©hicule enregistrÃ©.</p>
-                <?php else: ?>
-                    <div style="overflow-x: auto;">
-                        <table style="width: 100%; border-collapse: collapse; text-align: left;">
-                            <thead>
-                                <tr style="border-bottom: 2px solid var(--gray-200);">
-                                    <th style="padding: 1rem;">VÃ©hicule</th>
-                                    <th style="padding: 1rem;">Tarifs</th>
-                                    <th style="padding: 1rem;">Statut</th>
-                                    <th style="padding: 1rem; text-align: right;">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php foreach($vehicles as $v): ?>
-                                <tr style="border-bottom: 1px solid var(--gray-200);">
-                                    <td style="padding: 1rem; display: flex; align-items: center; gap: 1rem;">
-                                        <?php if($v['image']): ?>
-                                            <img src="/Projet_Auto/assets/images/<?php echo htmlspecialchars($v['image']); ?>" alt="Auto" style="width: 50px; height: 35px; object-fit: cover; border-radius: 4px;">
-                                        <?php else: ?>
-                                            <div style="width: 50px; height: 35px; background: var(--gray-200); border-radius: 4px; display: flex; align-items: center; justify-content: center;"><i class="fa fa-car" style="color: var(--gray-400)"></i></div>
-                                        <?php endif; ?>
-                                        <div>
-                                            <span style="font-weight: 500; display: block;"><?php echo htmlspecialchars($v['marque'] . ' ' . $v['modele']); ?></span>
-                                            <span style="font-size: 0.8rem; color: var(--gray-500);"><?php echo $v['annee']; ?> &bull; <?php echo $v['carburant']; ?></span>
-                                        </div>
-                                    </td>
-                                    <td style="padding: 1rem; font-size: 0.9rem;">
-                                        <div style="font-weight: 600;"><?php echo formatPrice($v['prix_jour']); ?> / j</div>
-                                        <div style="color: var(--gray-500);"><?php echo formatPrice($v['prix_heure']); ?> / h</div>
-                                    </td>
-                                    <td style="padding: 1rem;">
-                                        <span style="padding: 0.25rem 0.5rem; border-radius: 999px; font-size: 0.8rem; font-weight: 600;
-                                            <?php 
-                                            echo match($v['statut']) {
-                                                'disponible' => 'background-color: #d1fae5; color: #065f46;',
-                                                'reserve' => 'background-color: #dbeafe; color: #1e40af;',
-                                                'maintenance' => 'background-color: #fee2e2; color: #991b1b;',
-                                                default => 'background-color: var(--gray-200); color: var(--gray-700);'
-                                            };
-                                            ?>
-                                        ">
-                                            <?php echo ucfirst($v['statut']); ?>
-                                        </span>
-                                    </td>
-                                    <td style="padding: 1rem; text-align: right;">
-                                        <div class="d-flex" style="justify-content: flex-end; gap: 0.5rem;">
-                                            <a href="/Projet_Auto/admin/vehicle_edit.php?id=<?php echo $v['id']; ?>" class="btn btn-outline" style="padding: 0.25rem 0.5rem; font-size: 0.875rem;"><i class="fa fa-edit"></i></a>
-                                            <form method="POST" onsubmit="return confirm('Supprimer ce vÃ©hicule ?');" style="display: inline;">
-                                                <input type="hidden" name="delete_id" value="<?php echo $v['id']; ?>">
-                                                <button type="submit" class="btn" style="background-color: #fee2e2; color: #991b1b; padding: 0.25rem 0.5rem; font-size: 0.875rem;"><i class="fa fa-trash"></i></button>
-                                            </form>
-                                        </div>
-                                    </td>
-                                </tr>
-                                <?php endforeach; ?>
-                            </tbody>
-                        </table>
+    </main>
+
+    <!-- Modal Ajout/Modification -->
+    <div id="vehicleModal" class="modal-overlay">
+        <div class="modal" style="max-width: 800px;">
+            <h3 id="modalTitle">Ajouter un véhicule</h3>
+            <form action="vehicles.php" method="POST" enctype="multipart/form-data">
+                <input type="hidden" name="id" id="v_id">
+                <input type="hidden" name="old_image" id="v_old_image">
+                <div class="grid-2">
+                    <div class="form-group">
+                        <label for="marque">Marque</label>
+                        <input type="text" name="marque" id="v_marque" class="form-control" required>
                     </div>
-                <?php endif; ?>
-            </div>
+                    <div class="form-group">
+                        <label for="modele">Modèle</label>
+                        <input type="text" name="modele" id="v_modele" class="form-control" required>
+                    </div>
+                </div>
+                <div class="grid-2">
+                    <div class="form-group">
+                        <label for="image">Image du véhicule</label>
+                        <input type="file" name="image" id="v_image" class="form-control" accept="image/*">
+                    </div>
+                    <div class="form-group">
+                        <label for="annee">Année</label>
+                        <input type="number" name="annee" id="v_annee" class="form-control" required>
+                    </div>
+                </div>
+                <div class="grid-2">
+                    <div class="form-group">
+                        <label for="type_carburant">Carburant</label>
+                        <select name="type_carburant" id="v_carburant" class="form-control">
+                            <option value="Essence">Essence</option>
+                            <option value="Diesel">Diesel</option>
+                            <option value="Électrique">Électrique</option>
+                            <option value="Hybride">Hybride</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="transmission">Boîte</label>
+                        <select name="transmission" id="v_transmission" class="form-control">
+                            <option value="Manuelle">Manuelle</option>
+                            <option value="Automatique">Automatique</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="grid-3">
+                    <div class="form-group">
+                        <label for="nombre_places">Places</label>
+                        <input type="number" name="nombre_places" id="v_places" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="prix_jour">Prix / Jour (FCFA)</label>
+                        <input type="number" name="prix_jour" id="v_prix" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="statut">Statut</label>
+                        <select name="statut" id="v_statut" class="form-control">
+                            <option value="disponible">Disponible</option>
+                            <option value="reserve">Réservé</option>
+                            <option value="maintenance">Maintenance</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="description">Description</label>
+                    <textarea name="description" id="v_description" class="form-control" rows="3"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="caracteristiques">Caractéristiques (ex: Clim, GPS, etc.)</label>
+                    <textarea name="caracteristiques" id="v_caracteristiques" class="form-control" rows="2"></textarea>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-outline" onclick="closeModal()">Annuler</button>
+                    <button type="submit" class="btn btn-primary">Enregistrer</button>
+                </div>
+            </form>
         </div>
     </div>
-</div>
 
-<?php require_once __DIR__ . '/../includes/footer.php'; ?>
+    <script>
+        const modal = document.getElementById('vehicleModal');
+        
+        function openModal() {
+            document.getElementById('modalTitle').textContent = "Ajouter un véhicule";
+            document.getElementById('v_id').value = "";
+            document.getElementById('v_old_image').value = "";
+            document.getElementById('v_image').value = "";
+            document.getElementById('v_marque').value = "";
+            document.getElementById('v_modele').value = "";
+            document.getElementById('v_annee').value = new Date().getFullYear();
+            document.getElementById('v_prix').value = "";
+            document.getElementById('v_places').value = 5;
+            document.getElementById('v_description').value = "";
+            document.getElementById('v_caracteristiques').value = "";
+            modal.classList.add('show');
+        }
 
+        function closeModal() {
+            modal.classList.remove('show');
+        }
+
+        function editVehicle(v) {
+            document.getElementById('modalTitle').textContent = "Modifier le véhicule";
+            document.getElementById('v_id').value = v.id;
+            document.getElementById('v_old_image').value = v.image;
+            document.getElementById('v_image').value = "";
+            document.getElementById('v_marque').value = v.marque;
+            document.getElementById('v_modele').value = v.modele;
+            document.getElementById('v_annee').value = v.annee;
+            document.getElementById('v_carburant').value = v.type_carburant;
+            document.getElementById('v_transmission').value = v.transmission;
+            document.getElementById('v_places').value = v.nombre_places;
+            document.getElementById('v_prix').value = v.prix_jour;
+            document.getElementById('v_statut').value = v.statut;
+            document.getElementById('v_description').value = v.description;
+            document.getElementById('v_caracteristiques').value = v.caracteristiques;
+            modal.classList.add('show');
+        }
+    </script>
+</body>
+</html>

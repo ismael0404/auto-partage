@@ -1,48 +1,43 @@
-<?php
-// includes/footer.php
-?>
-    </main>
-    <footer style="background-color: #111; color: #fff; padding: 4rem 0 2rem;">
+<?php $base = BASE_URL; ?>
+    <footer class="footer">
         <div class="container">
-            <div style="display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 3rem; margin-bottom: 3rem;">
+            <div class="footer-grid">
                 <div>
-                    <div style="font-family: var(--font-heading); font-size: 1.5rem; font-weight: 800; display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem; color: #fff;">
-                        <i class="fa-solid fa-car"></i> AutoPartage
+                    <div class="logo" style="color:#fff;margin-bottom:16px">
+                        <span class="icon" style="background:#fff;color:#111">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><path d="M9 17h6"/><circle cx="17" cy="17" r="2"/></svg>
+                        </span> AutoPartage
                     </div>
-                    <p style="color: #888; font-size: 0.85rem; margin-top: 4rem;">&copy; <?php echo date('Y'); ?> AutoPartage - Tous Droits Réservés</p>
+                    <p>© <?= date('Y') ?> AutoPartage. Tous droits réservés.</p>
                 </div>
-                
                 <div>
-                    <h4 style="color: #fff; margin-bottom: 1.5rem; font-size: 1rem;">Liens utiles</h4>
-                    <ul style="list-style: none; display: flex; flex-direction: column; gap: 0.75rem; font-size: 0.85rem;">
-                        <li><a href="/Projet_Auto/" style="color: #888;">Accueil</a></li>
-                        <li><a href="/Projet_Auto/client/vehicles.php" style="color: #888;">Véhicules</a></li>
-                        <li><a href="#" style="color: #888;">A propos</a></li>
-                        <li><a href="#" style="color: #888;">Contact</a></li>
-                    </ul>
+                    <h4>Liens utiles</h4>
+                    <a href="<?= $base ?>/index.php">Accueil</a><br>
+                    <a href="<?= $base ?>/client/vehicles.php">Véhicules</a><br>
+                    <a href="#">Conditions</a><br>
+                    <a href="#">Confidentialité</a>
                 </div>
-                
                 <div>
-                    <h4 style="color: #fff; margin-bottom: 1.5rem; font-size: 1rem;">Service client</h4>
-                    <ul style="list-style: none; display: flex; flex-direction: column; gap: 0.75rem; font-size: 0.85rem;">
-                        <li><a href="#" style="color: #888;">FAQ</a></li>
-                        <li><a href="#" style="color: #888;">Conditions</a></li>
-                        <li><a href="#" style="color: #888;">Confidentialité</a></li>
-                        <li><a href="#" style="color: #888;">Assistance</a></li>
-                    </ul>
+                    <h4>Service client</h4>
+                    <a href="#">Contact</a><br>
+                    <a href="#">FAQ</a><br>
+                    <a href="#">Assistance</a>
                 </div>
-
                 <div>
-                    <h4 style="color: #fff; margin-bottom: 1.5rem; font-size: 1rem;">Nous suivre</h4>
-                    <div style="display: flex; gap: 1rem;">
-                        <a href="#" style="color: #fff; background: rgba(255,255,255,0.1); width: 35px; height: 35px; display: flex; align-items: center; justify-content: center; border-radius: 4px;"><i class="fa-brands fa-facebook-f"></i></a>
-                        <a href="#" style="color: #fff; background: rgba(255,255,255,0.1); width: 35px; height: 35px; display: flex; align-items: center; justify-content: center; border-radius: 4px;"><i class="fa-brands fa-twitter"></i></a>
-                        <a href="#" style="color: #fff; background: rgba(255,255,255,0.1); width: 35px; height: 35px; display: flex; align-items: center; justify-content: center; border-radius: 4px;"><i class="fa-brands fa-instagram"></i></a>
+                    <h4>Nous suivre</h4>
+                    <div class="social-links">
+                        <a href="#"><i class="fab fa-facebook-f"></i></a>
+                        <a href="#"><i class="fab fa-x-twitter"></i></a>
+                        <a href="#"><i class="fab fa-linkedin-in"></i></a>
+                        <a href="#"><i class="fab fa-instagram"></i></a>
                     </div>
                 </div>
             </div>
+            <div class="footer-bottom">
+                <p>© <?= date('Y') ?> AutoPartage - Tous droits réservés</p>
+            </div>
         </div>
     </footer>
-    <script src="/Projet_Auto/assets/js/main.js"></script>
+    <script src="<?= $base ?>/assets/js/app.js"></script>
 </body>
 </html>

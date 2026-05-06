@@ -1,93 +1,155 @@
-﻿<?php
-// admin/dashboard.php
-require_once __DIR__ . '/../includes/header.php';
-requireRole('admin');
+<?php
+require_once '../config/database.php';
+require_once '../includes/functions.php';
 
-// Statistiques
-$stats = [
-    'clients' => $pdo->query("SELECT COUNT(*) FROM users WHERE role = 'client' AND deleted_at IS NULL")->fetchColumn(),
-    'vehicles' => $pdo->query("SELECT COUNT(*) FROM vehicles WHERE deleted_at IS NULL")->fetchColumn(),
-    'reservations' => $pdo->query("SELECT COUNT(*) FROM reservations WHERE deleted_at IS NULL")->fetchColumn(),
-    'revenus' => $pdo->query("SELECT SUM(prix_total) FROM reservations WHERE statut IN ('confirmee', 'en_cours', 'terminee') AND deleted_at IS NULL")->fetchColumn() ?? 0
-];
+requireAdmin();
 
-// RÃ©servations rÃ©centes
-$stmt = $pdo->query("
-    SELECT r.*, u.prenom, u.nom, v.marque, v.modele 
-    FROM reservations r 
-    JOIN users u ON r.user_id = u.id 
-    JOIN vehicles v ON r.vehicle_id = v.id 
-    WHERE r.deleted_at IS NULL
-    ORDER BY r.created_at DESC LIMIT 5
-");
-$recentes = $stmt->fetchAll();
+// Statistiques Globales
+$stmt = $pdo->query("SELECT COUNT(*) FROM utilisateurs WHERE role = 'client' AND is_deleted = 0");
+$totalClients = $stmt->fetchColumn();
+
+$stmt = $pdo->query("SELECT COUNT(*) FROM vehicules WHERE is_deleted = 0");
+$totalVehicules = $stmt->fetchColumn();
+
+$stmt = $pdo->query("SELECT COUNT(*) FROM reservations");
+$totalReservations = $stmt->fetchColumn();
+
+$stmt = $pdo->query("SELECT SUM(prix_total) FROM reservations WHERE statut = 'confirmee' OR statut = 'terminee'");
+$totalRevenu = $stmt->fetchColumn() ?: 0;
+
+// Réservations récentes
+$stmt = $pdo->query("SELECT r.*, v.marque, v.modele, u.prenom, u.nom 
+                     FROM reservations r 
+                     JOIN vehicules v ON r.vehicule_id = v.id 
+                     JOIN utilisateurs u ON r.utilisateur_id = u.id 
+                     ORDER BY r.date_creation DESC LIMIT 5");
+$recentReservations = $stmt->fetchAll();
+
+// Clients récents
+$stmt = $pdo->query("SELECT * FROM utilisateurs WHERE role = 'client' AND is_deleted = 0 ORDER BY date_creation DESC LIMIT 5");
+$recentClients = $stmt->fetchAll();
+
+$pageTitle = "Dashboard Admin";
 ?>
-
-<div class="d-flex" style="max-width: 1200px; margin: 0 auto; gap: 2rem;">
-    <?php include __DIR__ . '/../includes/sidebar_admin.php'; ?>
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><?= $pageTitle ?> - AutoPartage</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body class="dashboard">
+    <?php include '../includes/sidebar.php'; ?>
     
-    <div style="flex: 1; padding: 2rem 0;">
-        <div class="d-flex justify-content-between align-items-center mb-4">
-            <h2>Tableau de bord</h2>
-            <div class="d-flex align-items-center" style="gap: 1rem;">
-                <span style="font-weight: 600;"><?php echo htmlspecialchars($_SESSION['user_name']); ?></span>
-                <div style="width: 40px; height: 40px; background-color: var(--gray-200); border-radius: 50%; display: flex; align-items: center; justify-content: center;"><i class="fa fa-user"></i></div>
+    <main class="dashboard-content">
+        <header class="dashboard-header">
+            <h1>Tableau de bord</h1>
+            <div class="user-info flex gap-2">
+                <span class="badge badge-success">Admin en ligne</span>
+                <strong><?= $_SESSION['user_prenom'] ?></strong>
             </div>
-        </div>
-        
-        <!-- KPIs -->
-        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.5rem; margin-bottom: 2rem;">
-            <div class="card">
-                <div class="card-body">
-                    <p style="color: var(--gray-500); font-size: 0.875rem; margin-bottom: 0.5rem;">Clients</p>
-                    <h3 style="font-size: 2rem;"><?php echo $stats['clients']; ?></h3>
-                </div>
-            </div>
-            <div class="card">
-                <div class="card-body">
-                    <p style="color: var(--gray-500); font-size: 0.875rem; margin-bottom: 0.5rem;">VÃ©hicules</p>
-                    <h3 style="font-size: 2rem;"><?php echo $stats['vehicles']; ?></h3>
-                </div>
-            </div>
-            <div class="card">
-                <div class="card-body">
-                    <p style="color: var(--gray-500); font-size: 0.875rem; margin-bottom: 0.5rem;">RÃ©servations</p>
-                    <h3 style="font-size: 2rem;"><?php echo $stats['reservations']; ?></h3>
-                </div>
-            </div>
-            <div class="card">
-                <div class="card-body">
-                    <p style="color: var(--gray-500); font-size: 0.875rem; margin-bottom: 0.5rem;">Revenus</p>
-                    <h3 style="font-size: 1.5rem;"><?php echo formatPrice($stats['revenus']); ?></h3>
-                </div>
-            </div>
-        </div>
-        
-        <!-- DerniÃ¨res rÃ©servations -->
-        <div class="card">
-            <div class="card-body">
-                <h3 class="mb-4">RÃ©servations rÃ©centes</h3>
-                <?php if(empty($recentes)): ?>
-                    <p class="text-center" style="color: var(--gray-500);">Aucune rÃ©servation pour le moment.</p>
-                <?php else: ?>
-                    <div style="overflow-x: auto;">
-                        <table style="width: 100%; border-collapse: collapse; text-align: left;">
-                            <tbody>
-                                <?php foreach($recentes as $r): ?>
-                                <tr style="border-bottom: 1px solid var(--gray-200);">
-                                    <td style="padding: 1rem;"><?php echo htmlspecialchars($r['prenom'] . ' ' . $r['nom']); ?></td>
-                                    <td style="padding: 1rem; color: var(--gray-500);"><?php echo htmlspecialchars($r['marque'] . ' ' . $r['modele']); ?></td>
-                                    <td style="padding: 1rem; text-align: right; color: var(--gray-500);"><?php echo date('d/m/Y', strtotime($r['created_at'])); ?></td>
-                                </tr>
-                                <?php endforeach; ?>
-                            </tbody>
-                        </table>
-                    </div>
-                <?php endif; ?>
-            </div>
-        </div>
-    </div>
-</div>
+        </header>
 
-<?php require_once __DIR__ . '/../includes/footer.php'; ?>
+        <?php $flash = getFlash(); if ($flash): ?>
+            <div class="flash flash-<?= $flash['type'] ?>"><?= $flash['message'] ?></div>
+        <?php endif; ?>
 
+        <div class="stat-cards">
+            <div class="stat-card">
+                <div class="label">Clients</div>
+                <div class="value"><?= $totalClients ?></div>
+                <div class="change">+12 ce mois</div>
+            </div>
+            <div class="stat-card">
+                <div class="label">Véhicules</div>
+                <div class="value"><?= $totalVehicules ?></div>
+                <div class="change">+2 ce mois</div>
+            </div>
+            <div class="stat-card">
+                <div class="label">Réservations</div>
+                <div class="value"><?= $totalReservations ?></div>
+                <div class="change">+8 ce mois</div>
+            </div>
+            <div class="stat-card dark">
+                <div class="label">Revenus</div>
+                <div class="value"><?= formatPrix($totalRevenu) ?></div>
+                <div class="change" style="color: #6ee7b7;">+15% vs mois dernier</div>
+            </div>
+        </div>
+
+        <div class="grid-2">
+            <div class="table-container">
+                <div class="table-header">
+                    <h3>Réservations récentes</h3>
+                    <a href="reservations.php" class="btn btn-outline btn-sm">Voir tout</a>
+                </div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Client</th>
+                            <th>Véhicule</th>
+                            <th>Date</th>
+                            <th>Statut</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($recentReservations as $res): ?>
+                        <tr>
+                            <td><?= clean($res['prenom'] . ' ' . $res['nom']) ?></td>
+                            <td><?= clean($res['marque'] . ' ' . $res['modele']) ?></td>
+                            <td><?= formatDate($res['date_debut']) ?></td>
+                            <td><?= getStatutBadge($res['statut']) ?></td>
+                        </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="table-container">
+                <div class="table-header">
+                    <h3>Nouveaux clients</h3>
+                    <a href="clients.php" class="btn btn-outline btn-sm">Gérer</a>
+                </div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Client</th>
+                            <th>Email</th>
+                            <th>Date</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($recentClients as $client): ?>
+                        <tr>
+                            <td><?= clean($client['prenom'] . ' ' . $client['nom']) ?></td>
+                            <td><?= clean($client['email']) ?></td>
+                            <td><?= formatDate($client['date_creation']) ?></td>
+                        </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="chart-container mt-4">
+            <h3>Évolution des réservations</h3>
+            <div style="height: 200px; display: flex; align-items: flex-end; gap: 20px; padding: 20px;">
+                <div style="flex: 1; background: #eee; height: 40%; border-radius: 4px;"></div>
+                <div style="flex: 1; background: #ddd; height: 60%; border-radius: 4px;"></div>
+                <div style="flex: 1; background: #ccc; height: 30%; border-radius: 4px;"></div>
+                <div style="flex: 1; background: #bbb; height: 80%; border-radius: 4px;"></div>
+                <div style="flex: 1; background: #aaa; height: 50%; border-radius: 4px;"></div>
+                <div style="flex: 1; background: var(--primary); height: 90%; border-radius: 4px;"></div>
+                <div style="flex: 1; background: #999; height: 70%; border-radius: 4px;"></div>
+            </div>
+            <div style="display: flex; justify-content: space-between; padding: 0 20px; font-size: 0.8rem; color: var(--secondary);">
+                <span>Lun</span><span>Mar</span><span>Mer</span><span>Jeu</span><span>Ven</span><span>Sam</span><span>Dim</span>
+            </div>
+        </div>
+    </main>
+</body>
+</html>

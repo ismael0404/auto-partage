@@ -1,86 +1,92 @@
 <?php
-// index.php
-require_once __DIR__ . '/includes/header.php';
+require_once 'config/database.php';
+require_once 'includes/functions.php';
 
-// Récupérer les véhicules en vedette (3 véhicules disponibles)
-$stmt = $pdo->query("SELECT * FROM vehicles WHERE deleted_at IS NULL AND statut != 'maintenance' ORDER BY created_at DESC LIMIT 4");
-$vedettes = $stmt->fetchAll();
+$pageTitle = "Accueil";
+include 'includes/header.php';
+
+// Récupérer quelques véhicules en vedette
+$stmt = $pdo->query("SELECT * FROM vehicules WHERE statut = 'disponible' AND is_deleted = 0 LIMIT 4");
+$featuredVehicles = $stmt->fetchAll();
 ?>
 
-<!-- Hero Section -->
-<div style="background-color: var(--surface-color); padding: 5rem 0 7rem; position: relative;">
-    <div class="container d-flex align-items-center justify-content-between" style="gap: 2rem;">
-        <div style="flex: 1; max-width: 550px;">
-            <h1 style="font-size: 3.5rem; margin-bottom: 1.5rem; letter-spacing: -0.02em; font-weight: 800;">Louez une voiture<br>en toute simplicité</h1>
-            <p style="font-size: 1.15rem; color: var(--gray-500); margin-bottom: 2.5rem; font-weight: 400; line-height: 1.6;">La meilleure plateforme d'autopartage.<br>Rapide, sécurisée et économique.</p>
-            <div class="d-flex" style="gap: 1rem;">
-                <a href="/Projet_Auto/client/vehicles.php" class="btn btn-primary" style="padding: 1rem 2rem; font-size: 1.125rem;">Réserver maintenant</a>
-                <a href="/Projet_Auto/client/vehicles.php" class="btn btn-outline" style="padding: 1rem 2rem; font-size: 1.125rem;">Voir les véhicules</a>
-            </div>
-        </div>
-        <div style="flex: 1.2; text-align: right;">
-            <img src="/Projet_Auto/assets/images/image voiture.jfif" alt="Voiture de location" style="max-width: 100%; border-radius: var(--border-radius); box-shadow: var(--shadow-lg);">
+<section class="hero container">
+    <div class="hero-content">
+        <h1>Louez une voiture en toute simplicité</h1>
+        <p>La meilleure plateforme d'autopartage rapide, sécurisée et économique. Profitez de nos tarifs compétitifs et de notre large gamme de véhicules.</p>
+        <div class="hero-actions">
+            <a href="client/vehicles.php" class="btn btn-primary btn-lg">Réserver maintenant</a>
+            <a href="client/vehicles.php" class="btn btn-outline btn-lg">Voir les véhicules</a>
         </div>
     </div>
-</div>
+    <div class="hero-image">
+        <img src="assets/images/vehicules/image voiture.jfif" alt="Car sharing hero">
+    </div>
+</section>
 
-<!-- Véhicules en vedette -->
-<div class="container" style="padding: 5rem 0;">
-    <div class="d-flex justify-content-between align-items-center mb-5">
-        <h2 style="font-size: 2rem; letter-spacing: -0.02em;">Nos véhicules en vedette</h2>
-        <a href="/Projet_Auto/client/vehicles.php" style="color: var(--gray-500); font-weight: 500; font-size: 0.95rem;">Voir tout</a>
+<section class="section container">
+    <div class="section-title">
+        <h2>Nos véhicules en vedette</h2>
+        <a href="client/vehicles.php">Voir tout &rarr;</a>
     </div>
     
-    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.5rem;">
-        <?php foreach($vedettes as $v): ?>
-        <div class="card" style="border-radius: var(--border-radius-btn);">
-            <div style="height: 160px; background-color: var(--gray-50); display: flex; align-items: center; justify-content: center; overflow: hidden; padding: 1rem;">
-                <?php if($v['image']): ?>
-                    <img src="/Projet_Auto/assets/images/<?php echo htmlspecialchars($v['image']); ?>" alt="Voiture" style="width: 100%; height: 100%; object-fit: contain;">
-                <?php else: ?>
-                    <i class="fa fa-car" style="font-size: 4rem; color: var(--gray-300);"></i>
-                <?php endif; ?>
-            </div>
-            <div class="card-body" style="padding: 1rem;">
-                <h3 style="font-size: 1.125rem; margin-bottom: 0.25rem; font-family: var(--font-primary); font-weight: 600; color: var(--primary-color);"><?php echo htmlspecialchars($v['marque'] . ' ' . $v['modele']); ?></h3>
-                <p style="color: var(--gray-500); font-size: 0.8rem; margin-bottom: 1rem;">
-                    <?php echo htmlspecialchars($v['carburant']); ?>
-                </p>
-                <div style="font-weight: 700; font-size: 1.125rem; color: var(--primary-color);">
-                    <?php echo formatPrice($v['prix_jour']); ?> <span style="font-weight: 400; color: var(--gray-500); font-size: 0.8rem;">/ jour</span>
-                </div>
+    <div class="grid-4">
+        <?php foreach ($featuredVehicles as $vehicle): ?>
+        <div class="vehicle-card">
+            <img src="<?= getVehiculeImage($vehicle['image']) ?>" alt="<?= clean($vehicle['marque'] . ' ' . $vehicle['modele']) ?>" class="vehicle-card-img">
+            <div class="vehicle-card-body">
+                <p class="type"><?= clean($vehicle['type_carburant']) ?></p>
+                <h3><?= clean($vehicle['marque'] . ' ' . $vehicle['modele']) ?></h3>
+                <p class="price"><?= formatPrix($vehicle['prix_jour']) ?> <span>/ jour</span></p>
+                <a href="client/vehicle_detail.php?id=<?= $vehicle['id'] ?>" class="btn btn-primary btn-sm btn-block mt-2">Détails</a>
             </div>
         </div>
         <?php endforeach; ?>
     </div>
-</div>
+</section>
 
-<!-- Pourquoi nous choisir -->
-<div class="container" style="padding: 5rem 0 7rem;">
-    <h2 style="font-size: 2rem; margin-bottom: 3rem; letter-spacing: -0.02em;">Pourquoi choisir AutoPartage ?</h2>
-    
-    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 2rem;">
-        <div style="border: 1px solid var(--gray-200); padding: 2rem; border-radius: var(--border-radius-btn); background-color: var(--surface-color);">
-            <i class="fa-solid fa-bolt" style="font-size: 1.5rem; color: var(--primary-color); margin-bottom: 1rem;"></i>
-            <h3 style="font-size: 1.125rem; margin-bottom: 0.5rem; font-family: var(--font-primary); font-weight: 600;">Rapide</h3>
-            <p style="color: var(--gray-500); font-size: 0.85rem;">Réservation en quelques clics.</p>
+<section class="section bg-alt" id="how-it-works" style="background-color: var(--bg-alt);">
+    <div class="container">
+        <div class="section-title text-center" style="display: block;">
+            <h2 class="mb-4">Pourquoi choisir AutoPartage ?</h2>
         </div>
-        <div style="border: 1px solid var(--gray-200); padding: 2rem; border-radius: var(--border-radius-btn); background-color: var(--surface-color);">
-            <i class="fa-solid fa-shield-halved" style="font-size: 1.5rem; color: var(--primary-color); margin-bottom: 1rem;"></i>
-            <h3 style="font-size: 1.125rem; margin-bottom: 0.5rem; font-family: var(--font-primary); font-weight: 600;">Sécurisé</h3>
-            <p style="color: var(--gray-500); font-size: 0.85rem;">Paiements sécurisés et véhicules assurés.</p>
-        </div>
-        <div style="border: 1px solid var(--gray-200); padding: 2rem; border-radius: var(--border-radius-btn); background-color: var(--surface-color);">
-            <i class="fa-solid fa-route" style="font-size: 1.5rem; color: var(--primary-color); margin-bottom: 1rem;"></i>
-            <h3 style="font-size: 1.125rem; margin-bottom: 0.5rem; font-family: var(--font-primary); font-weight: 600;">Flexible</h3>
-            <p style="color: var(--gray-500); font-size: 0.85rem;">Annulation gratuite et dates flexibles.</p>
-        </div>
-        <div style="border: 1px solid var(--gray-200); padding: 2rem; border-radius: var(--border-radius-btn); background-color: var(--surface-color);">
-            <i class="fa-solid fa-wallet" style="font-size: 1.5rem; color: var(--primary-color); margin-bottom: 1rem;"></i>
-            <h3 style="font-size: 1.125rem; margin-bottom: 0.5rem; font-family: var(--font-primary); font-weight: 600;">Économique</h3>
-            <p style="color: var(--gray-500); font-size: 0.85rem;">Les meilleurs prix du marché sans frais cachés.</p>
+        <div class="features">
+            <div class="feature-item">
+                <div class="feature-icon"><i class="fas fa-bolt"></i></div>
+                <h3>Rapide</h3>
+                <p>Réservation en quelques clics seulement.</p>
+            </div>
+            <div class="feature-item">
+                <div class="feature-icon"><i class="fas fa-shield-alt"></i></div>
+                <h3>Sécurisé</h3>
+                <p>Paiements sécurisés et véhicules assurés.</p>
+            </div>
+            <div class="feature-item">
+                <div class="feature-icon"><i class="fas fa-sync-alt"></i></div>
+                <h3>Flexible</h3>
+                <p>Annulation gratuite et modification flexible.</p>
+            </div>
+            <div class="feature-item">
+                <div class="feature-icon"><i class="fas fa-tags"></i></div>
+                <h3>Économique</h3>
+                <p>Les meilleurs prix du marché garantis.</p>
+            </div>
         </div>
     </div>
-</div>
+</section>
 
-<?php require_once __DIR__ . '/includes/footer.php'; ?>
+<section class="section container" id="about">
+    <div class="grid-2" style="align-items: center;">
+        <div>
+            <img src="https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?q=80&w=1000&auto=format&fit=crop" alt="About us" style="border-radius: var(--radius);">
+        </div>
+        <div>
+            <h2 class="mb-3">À propos de nous</h2>
+            <p class="mb-3">AutoPartage est né de la volonté de simplifier la mobilité urbaine. Nous croyons que la possession d'un véhicule ne devrait pas être un frein à votre liberté de mouvement.</p>
+            <p class="mb-3">Notre mission est de fournir un accès facile, abordable et durable à une flotte de véhicules modernes pour tous vos besoins, qu'il s'agisse d'un week-end à la campagne ou d'un rendez-vous d'affaires en ville.</p>
+            <a href="auth/register.php" class="btn btn-primary">Rejoignez-nous</a>
+        </div>
+    </div>
+</section>
+
+<?php include 'includes/footer.php'; ?>

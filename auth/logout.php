@@ -1,12 +1,9 @@
-﻿<?php
-// auth/logout.php
-if (session_status() === PHP_SESSION_NONE) { session_start(); }
-require_once __DIR__ . '/../includes/functions.php';
+<?php
+require_once '../config/database.php';
+require_once '../includes/functions.php';
 
-// DÃ©truire toutes les variables de session
 $_SESSION = array();
 
-// DÃ©truire le cookie de session si prÃ©sent
 if (ini_get("session.use_cookies")) {
     $params = session_get_cookie_params();
     setcookie(session_name(), '', time() - 42000,
@@ -15,13 +12,11 @@ if (ini_get("session.use_cookies")) {
     );
 }
 
-// DÃ©truire la session
 session_destroy();
 
-// DÃ©marrer une nouvelle session pour le flash message
-if (session_status() === PHP_SESSION_NONE) { session_start(); }
-setFlashMessage("Vous avez Ã©tÃ© dÃ©connectÃ© avec succÃ¨s.", "info");
+// Démarrer une nouvelle session pour le message flash
+session_start();
+setFlash('info', "Vous avez été déconnecté.");
 
-header('Location: /Projet_Auto/auth/login.php');
-exit();
-
+header("Location: " . BASE_URL . "/index.php");
+exit;
