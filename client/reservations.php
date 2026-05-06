@@ -25,7 +25,7 @@ if (isset($_POST['cancel_id'])) {
     redirect('/client/reservations.php');
 }
 
-$stmt = $pdo->prepare("SELECT r.*, v.marque, v.modele, v.image 
+$stmt = $pdo->prepare("SELECT r.*, v.marque, v.modele, v.image, v.immatriculation, v.type_carburant, v.transmission, v.nombre_places 
                        FROM reservations r 
                        JOIN vehicules v ON r.vehicule_id = v.id 
                        WHERE r.utilisateur_id = :uid 
@@ -99,8 +99,14 @@ $pageTitle = "Mes réservations";
                                         <input type="hidden" name="cancel_id" value="<?= $res['id'] ?>">
                                         <button type="submit" class="btn btn-danger btn-sm">Annuler</button>
                                     </form>
+                                <?php elseif ($res['statut'] === 'confirmee'): ?>
+                                    <?php if ($res['statut_paiement'] === 'non_paye' && !$res['mode_paiement']): ?>
+                                        <a href="paiement.php?id=<?= $res['id'] ?>" class="btn btn-primary btn-sm">Régler le paiement</a>
+                                    <?php else: ?>
+                                        <a href="recu.php?id=<?= $res['id'] ?>" class="btn btn-success btn-sm" target="_blank"><i class="fas fa-download"></i> Reçu</a>
+                                    <?php endif; ?>
                                 <?php endif; ?>
-                                <button class="btn btn-outline btn-sm">Voir</button>
+                                <button class="btn btn-outline btn-sm" onclick='showDetails(<?= json_encode($res) ?>)'>Voir</button>
                             </td>
                         </tr>
                         <?php endforeach; ?>
@@ -109,5 +115,91 @@ $pageTitle = "Mes réservations";
             </table>
         </div>
     </main>
+
+    <!-- Modal Détails -->
+    <div id="detailsModal" class="modal-overlay">
+        <div class="modal" style="max-width: 600px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h3 id="modalTitle">Détails de la réservation</h3>
+                <button onclick="closeModal()" style="background: none; border: none; font-size: 1.5rem; cursor: pointer;">&times;</button>
+            </div>
+            
+            <div id="modalContent">
+                <div class="flex gap-2 mb-3">
+                    <img id="modalImage" src="" alt="" style="width: 200px; height: 130px; object-fit: cover; border-radius: 8px;">
+                    <div>
+                        <h2 id="modalVehicleName" style="margin-bottom: 5px;"></h2>
+                        <span id="modalBadge" class="badge"></span>
+                        <div style="margin-top: 10px; font-size: 0.9rem; color: var(--secondary);">
+                            <p><i class="fas fa-id-card"></i> Immatriculation : <strong id="modalPlate"></strong></p>
+                            <p><i class="fas fa-gas-pump"></i> Énergie : <strong id="modalFuel"></strong></p>
+                            <p><i class="fas fa-cog"></i> Boîte : <strong id="modalGearbox"></strong></p>
+                            <p><i class="fas fa-users"></i> Places : <strong id="modalSeats"></strong></p>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="background: var(--bg-alt); padding: 15px; border-radius: 8px; margin-top: 20px;">
+                    <h4 style="margin-bottom: 10px; border-bottom: 1px solid var(--border); padding-bottom: 5px;">Informations de location</h4>
+                    <div class="grid-2">
+                        <div>
+                            <p class="text-sm text-secondary">Date de début</p>
+                            <p id="modalDateStart" class="font-bold"></p>
+                        </div>
+                        <div>
+                            <p class="text-sm text-secondary">Date de fin</p>
+                            <p id="modalDateEnd" class="font-bold"></p>
+                        </div>
+                        <div>
+                            <p class="text-sm text-secondary">Durée totale</p>
+                            <p id="modalDuration" class="font-bold"></p>
+                        </div>
+                        <div>
+                            <p class="text-sm text-secondary">Prix Total</p>
+                            <p id="modalPrice" class="font-bold text-primary" style="font-size: 1.2rem;"></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="modal-actions" style="margin-top: 20px;">
+                <button class="btn btn-primary btn-block" onclick="closeModal()">Fermer</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function showDetails(res) {
+            document.getElementById('modalVehicleName').innerText = res.marque + ' ' + res.modele;
+            document.getElementById('modalImage').src = res.image ? '../assets/images/vehicules/' + res.image : 'https://images.unsplash.com/photo-1494976388531-d1058494cdd8?w=400&h=300&fit=crop';
+            document.getElementById('modalPlate').innerText = res.immatriculation || 'N/A';
+            document.getElementById('modalFuel').innerText = res.type_carburant;
+            document.getElementById('modalGearbox').innerText = res.transmission;
+            document.getElementById('modalSeats').innerText = res.nombre_places;
+            document.getElementById('modalDateStart').innerText = new Date(res.date_debut).toLocaleString('fr-FR');
+            document.getElementById('modalDateEnd').innerText = new Date(res.date_fin).toLocaleString('fr-FR');
+            document.getElementById('modalDuration').innerText = res.duree_jours + ' jour(s)';
+            document.getElementById('modalPrice').innerText = new Intl.NumberFormat('fr-FR').format(res.prix_total) + ' FCFA';
+            
+            // Badge statut
+            const badge = document.getElementById('modalBadge');
+            badge.innerText = res.statut.replace('_', ' ').toUpperCase();
+            badge.className = 'badge badge-' + (res.statut === 'confirmee' ? 'success' : (res.statut === 'en_attente' ? 'warning' : 'danger'));
+
+            document.getElementById('detailsModal').style.display = 'flex';
+        }
+
+        function closeModal() {
+            document.getElementById('detailsModal').style.display = 'none';
+        }
+
+        // Fermer au clic extérieur
+        window.onclick = function(event) {
+            const modal = document.getElementById('detailsModal');
+            if (event.target == modal) {
+                closeModal();
+            }
+        }
+    </script>
 </body>
 </html>

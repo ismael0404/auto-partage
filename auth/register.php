@@ -79,7 +79,7 @@ $pageTitle = "Inscription";
             <h2>Rejoignez-nous !</h2>
             <p>Créez votre compte et commencez votre expérience d'autopartage en toute liberté.</p>
             <div class="mt-4">
-                <img src="../assets/images/vehicules/voiture de page de connexion et inscprition.jfif" alt="Register Image" style="width: 80%; border-radius: 12px; opacity: 0.8;">
+                <img src="../assets/images/logo de page/incription.jfif" alt="Register Image" style="width: 90%; opacity: 1;">
             </div>
         </div>
         <div class="auth-right">

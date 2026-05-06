@@ -62,7 +62,7 @@ $pageTitle = "Connexion";
             <h2>Bienvenue !</h2>
             <p>Connectez-vous à votre compte pour continuer votre expérience d'autopartage.</p>
             <div class="mt-4">
-                <img src="../assets/images/vehicules/voiture de page de connexion et inscprition.jfif" alt="Login Image" style="width: 80%; border-radius: 12px; opacity: 0.8;">
+                <img src="../assets/images/logo de page/connexion.jfif" alt="Login Image" style="width: 90%; opacity: 1;">
             </div>
         </div>
         <div class="auth-right">

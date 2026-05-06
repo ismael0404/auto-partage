@@ -27,8 +27,11 @@ $current_page = basename($_SERVER['PHP_SELF']);
             <a href="<?= $base ?>/admin/reservations.php" class="<?= $current_page === 'reservations.php' ? 'active' : '' ?>">
                 <span class="icon"><i class="fas fa-calendar-check"></i></span> <span>Réservations</span>
             </a>
+            <a href="<?= $base ?>/admin/notifications.php" class="<?= $current_page === 'notifications.php' ? 'active' : '' ?>">
+                <span class="icon"><i class="fas fa-bell"></i></span> <span>Notifications</span>
+            </a>
             <a href="<?= $base ?>/admin/messages.php" class="<?= $current_page === 'messages.php' ? 'active' : '' ?>">
-                <span class="icon"><i class="fas fa-envelope"></i></span> <span>Messages</span>
+                <span class="icon"><i class="fas fa-comment-dots"></i></span> <span>Messagerie</span>
             </a>
             <a href="<?= $base ?>/admin/settings.php" class="<?= $current_page === 'settings.php' ? 'active' : '' ?>">
                 <span class="icon"><i class="fas fa-cog"></i></span> <span>Paramètres</span>
@@ -46,8 +49,11 @@ $current_page = basename($_SERVER['PHP_SELF']);
             <a href="<?= $base ?>/client/reservations.php" class="<?= $current_page === 'reservations.php' ? 'active' : '' ?>">
                 <span class="icon"><i class="fas fa-calendar-check"></i></span> <span>Mes réservations</span>
             </a>
+            <a href="<?= $base ?>/client/notifications.php" class="<?= $current_page === 'notifications.php' ? 'active' : '' ?>">
+                <span class="icon"><i class="fas fa-bell"></i></span> <span>Notifications</span>
+            </a>
             <a href="<?= $base ?>/client/messages.php" class="<?= $current_page === 'messages.php' ? 'active' : '' ?>">
-                <span class="icon"><i class="fas fa-envelope"></i></span> <span>Messages</span>
+                <span class="icon"><i class="fas fa-comment-dots"></i></span> <span>Messagerie</span>
             </a>
         <?php endif; ?>
         

@@ -181,6 +181,15 @@ function countUnreadMessages($pdo, $userId) {
 }
 
 /**
+ * Compter les messages de chat non lus
+ */
+function countUnreadChatMessages($pdo, $userId) {
+    $stmt = $pdo->prepare("SELECT COUNT(*) FROM chat_messages WHERE destinataire_id = :uid AND lu = 0");
+    $stmt->execute([':uid' => $userId]);
+    return $stmt->fetchColumn();
+}
+
+/**
  * Obtenir l'image du véhicule ou une image par défaut
  */
 function getVehiculeImage($image) {

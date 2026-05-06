@@ -2,22 +2,45 @@
 require_once '../config/database.php';
 require_once '../includes/functions.php';
 
-requireLogin();
+requireClient();
 
 $userId = $_SESSION['user_id'];
 
-// Marquer tout comme lu
-if (isset($_POST['mark_read'])) {
-    $stmt = $pdo->prepare("UPDATE messages SET lu = 1 WHERE utilisateur_id = :uid");
-    $stmt->execute([':uid' => $userId]);
+// Trouver l'ID de l'administrateur
+$stmt = $pdo->query("SELECT id FROM utilisateurs WHERE role = 'admin' LIMIT 1");
+$admin = $stmt->fetch();
+$adminId = $admin['id'];
+
+// Envoyer un message
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['message']) && !empty(trim($_POST['message']))) {
+    $message = clean($_POST['message']);
+    $stmt = $pdo->prepare("INSERT INTO chat_messages (expediteur_id, destinataire_id, message) VALUES (:exp, :dest, :msg)");
+    $stmt->execute([
+        ':exp' => $userId,
+        ':dest' => $adminId,
+        ':msg' => $message
+    ]);
     redirect('/client/messages.php');
 }
 
-$stmt = $pdo->prepare("SELECT * FROM messages WHERE utilisateur_id = :uid ORDER BY date_creation DESC");
-$stmt->execute([':uid' => $userId]);
-$messages = $stmt->fetchAll();
+// Marquer comme lu
+$stmt = $pdo->prepare("UPDATE chat_messages SET lu = 1 WHERE destinataire_id = :uid AND expediteur_id = :admin_id");
+$stmt->execute([':uid' => $userId, ':admin_id' => $adminId]);
 
-$pageTitle = "Mes messages";
+// Charger la conversation
+$stmt = $pdo->prepare("SELECT * FROM chat_messages 
+                       WHERE (expediteur_id = :uid1 AND destinataire_id = :admin_id1) 
+                       OR (expediteur_id = :admin_id2 AND destinataire_id = :uid2) 
+                       ORDER BY date_envoi ASC");
+$stmt->execute([
+    ':uid1' => $userId, 
+    ':admin_id1' => $adminId, 
+    ':admin_id2' => $adminId, 
+    ':uid2' => $userId
+]);
+$chatMessages = $stmt->fetchAll();
+
+$pageTitle = "Messagerie";
 ?>
 <!DOCTYPE html>
 <html lang="fr">
@@ -35,32 +58,54 @@ $pageTitle = "Mes messages";
     
     <main class="dashboard-content">
         <header class="dashboard-header">
-            <h1>Mes messages</h1>
-            <form action="messages.php" method="POST">
-                <button type="submit" name="mark_read" class="btn btn-outline btn-sm">Tout marquer comme lu</button>
-            </form>
+            <h1>Messagerie Admin</h1>
         </header>
 
-        <div class="messages-list" style="display: flex; flex-direction: column; gap: 16px;">
-            <?php if (empty($messages)): ?>
-                <div class="table-container p-4 text-center" style="padding: 40px;">
-                    <p>Vous n'avez aucun message.</p>
-                </div>
-            <?php else: ?>
-                <?php foreach ($messages as $msg): ?>
-                <div class="table-container" style="padding: 20px; border-left: 4px solid <?= $msg['lu'] ? 'var(--border)' : 'var(--primary)' ?>; background: <?= $msg['lu'] ? '#fff' : '#f9f9f9' ?>;">
-                    <div class="flex-between mb-1">
-                        <h3 style="font-size: 1rem; color: <?= $msg['lu'] ? 'var(--secondary)' : 'var(--primary)' ?>;">
-                            <?= clean($msg['titre']) ?>
-                            <?php if (!$msg['lu']): ?><span class="badge badge-primary" style="background: var(--primary); color: #fff; margin-left: 8px;">Nouveau</span><?php endif; ?>
-                        </h3>
-                        <span style="font-size: 0.8rem; color: var(--secondary);"><?= formatDateTime($msg['date_creation']) ?></span>
+        <div class="chat-wrapper">
+            <div class="chat-header">
+                <div class="flex gap-2">
+                    <div style="width: 40px; height: 40px; background: var(--primary); color: #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+                        <i class="fas fa-user-shield"></i>
                     </div>
-                    <p style="color: var(--secondary); font-size: 0.9rem;"><?= nl2br(clean($msg['contenu'])) ?></p>
+                    <div>
+                        <strong>Support AutoPartage</strong>
+                        <p style="font-size: 0.7rem; color: var(--success);"><i class="fas fa-circle" style="font-size: 0.5rem;"></i> En ligne</p>
+                    </div>
                 </div>
-                <?php endforeach; ?>
-            <?php endif; ?>
+            </div>
+
+            <div class="chat-messages" id="chatBox">
+                <?php if (empty($chatMessages)): ?>
+                    <div style="text-align: center; margin-top: 50px; color: var(--secondary);">
+                        <i class="fas fa-comments" style="font-size: 3rem; opacity: 0.2; margin-bottom: 10px;"></i>
+                        <p>Commencez la discussion avec notre équipe de support.</p>
+                    </div>
+                <?php else: ?>
+                    <?php foreach ($chatMessages as $msg): ?>
+                        <div class="message-bubble <?= $msg['expediteur_id'] == $userId ? 'message-sent' : 'message-received' ?>">
+                            <?= nl2br(clean($msg['message'])) ?>
+                            <div class="message-time">
+                                <?= date('H:i', strtotime($msg['date_envoi'])) ?>
+                                <?php if ($msg['expediteur_id'] == $userId): ?>
+                                    <i class="fas fa-check-double" style="color: <?= $msg['lu'] ? '#53bdeb' : '#8696a0' ?>; margin-left: 4px;"></i>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
+                <?php endif; ?>
+            </div>
+
+            <form action="messages.php" method="POST" class="chat-input-area">
+                <input type="text" name="message" placeholder="Tapez votre message ici..." required autocomplete="off">
+                <button type="submit"><i class="fas fa-paper-plane"></i></button>
+            </form>
         </div>
     </main>
+
+    <script>
+        // Scroll to bottom
+        const chatBox = document.getElementById('chatBox');
+        chatBox.scrollTop = chatBox.scrollHeight;
+    </script>
 </body>
 </html>

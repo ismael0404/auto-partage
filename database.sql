@@ -91,7 +91,7 @@ CREATE TABLE messages (
 
 -- Admin par défaut (mot de passe: admin123)
 INSERT INTO utilisateurs (prenom, nom, email, mot_de_passe, role, statut) VALUES
-('Admin', 'System', 'admin@autopartage.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'admin', 'actif');
+('Admin', 'System', 'admin@autopartage.com', '$2y$10$jh8e0XV4ZwQZbS6YpbWEh.BFEos6U7E88ifr5ATBgYdLUFrHVcnna', 'admin', 'actif');
 
 -- Clients de démonstration (mot de passe: password)
 INSERT INTO utilisateurs (prenom, nom, email, mot_de_passe, telephone, role, statut) VALUES
