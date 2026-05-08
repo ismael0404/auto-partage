@@ -51,6 +51,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ':prix_t' => $prix_total
             ]);
 
+            // Notification pour l'admin
+            $admin_notif_stmt = $pdo->prepare("INSERT INTO messages (utilisateur_id, titre, contenu, type) VALUES (1, :titre, :contenu, 'info')");
+            $admin_notif_stmt->execute([
+                ':titre' => "Nouvelle réservation",
+                ':contenu' => $_SESSION['user_prenom'] . " a réservé le véhicule " . $vehicle['marque'] . " " . $vehicle['modele'] . "."
+            ]);
+
             setFlash('success', "Votre réservation a été enregistrée et est en attente de confirmation.");
             redirect('/client/reservations.php');
         } catch (PDOException $e) {

@@ -4,36 +4,31 @@ require_once '../includes/functions.php';
 
 requireAdmin();
 
-// Envoyer une notification
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['send_notif'])) {
-    $uid = (int)$_POST['utilisateur_id'];
-    $titre = clean($_POST['titre']);
-    $contenu = clean($_POST['contenu']);
-    $type = $_POST['type'];
+$adminId = $_SESSION['user_id'];
 
-    $stmt = $pdo->prepare("INSERT INTO messages (utilisateur_id, titre, contenu, type) VALUES (:uid, :titre, :contenu, :type)");
-    $stmt->execute([
-        ':uid' => $uid,
-        ':titre' => $titre,
-        ':contenu' => $contenu,
-        ':type' => $type
-    ]);
-    setFlash('success', "Notification envoyée avec succès.");
+// Marquer tout comme lu
+if (isset($_POST['mark_all_read'])) {
+    $stmt = $pdo->prepare("UPDATE messages SET lu = 1 WHERE utilisateur_id = :uid");
+    $stmt->execute([':uid' => $adminId]);
+    setFlash('success', "Toutes les notifications ont été marquées comme lues.");
     redirect('notifications.php');
 }
 
-// Récupérer tous les clients
-$stmt = $pdo->query("SELECT id, prenom, nom, email FROM utilisateurs WHERE role = 'client' AND is_deleted = 0 ORDER BY prenom ASC");
-$clients = $stmt->fetchAll();
+// Marquer une notification spécifique comme lue
+if (isset($_POST['mark_read'])) {
+    $notifId = (int)$_POST['mark_read'];
+    $stmt = $pdo->prepare("UPDATE messages SET lu = 1 WHERE id = :id AND utilisateur_id = :uid");
+    $stmt->execute([':id' => $notifId, ':uid' => $adminId]);
+    setFlash('success', "Notification marquée comme lue.");
+    redirect('notifications.php');
+}
 
-// Récupérer les dernières notifications envoyées
-$stmt = $pdo->query("SELECT m.*, u.prenom, u.nom 
-                     FROM messages m 
-                     JOIN utilisateurs u ON m.utilisateur_id = u.id 
-                     ORDER BY m.date_creation DESC LIMIT 20");
+// Récupérer les notifications de l'admin
+$stmt = $pdo->prepare("SELECT * FROM messages WHERE utilisateur_id = :uid ORDER BY date_creation DESC");
+$stmt->execute([':uid' => $adminId]);
 $notifications = $stmt->fetchAll();
 
-$pageTitle = "Gestion des Notifications";
+$pageTitle = "Mes Notifications";
 ?>
 <!DOCTYPE html>
 <html lang="fr">
@@ -51,10 +46,12 @@ $pageTitle = "Gestion des Notifications";
     
     <main class="dashboard-content">
         <header class="dashboard-header">
-            <h1>Gestion des Notifications</h1>
-            <button class="btn btn-primary" onclick="document.getElementById('notifModal').style.display='flex'">
-                <i class="fas fa-plus"></i> Nouvelle Notification
-            </button>
+            <h1>Mes Notifications</h1>
+            <form action="notifications.php" method="POST">
+                <button type="submit" name="mark_all_read" class="btn btn-outline">
+                    <i class="fas fa-check-double"></i> Tout marquer comme lu
+                </button>
+            </form>
         </header>
 
         <?php $flash = getFlash(); if ($flash): ?>
@@ -63,68 +60,50 @@ $pageTitle = "Gestion des Notifications";
 
         <div class="table-container">
             <div class="table-header">
-                <h3>Dernières notifications envoyées</h3>
+                <h3>Centre de notifications</h3>
             </div>
             <table>
                 <thead>
                     <tr>
-                        <th>Destinataire</th>
                         <th>Titre</th>
+                        <th>Message</th>
                         <th>Type</th>
                         <th>Date</th>
-                        <th>Statut</th>
+                        <th>Action</th>
                     </tr>
                 </thead>
                 <tbody>
-                    <?php foreach ($notifications as $n): ?>
-                    <tr>
-                        <td><strong><?= clean($n['prenom'] . ' ' . $n['nom']) ?></strong></td>
-                        <td><?= clean($n['titre']) ?></td>
-                        <td><span class="badge badge-<?= $n['type'] ?>"><?= ucfirst($n['type']) ?></span></td>
-                        <td><?= formatDateTime($n['date_creation']) ?></td>
-                        <td><?= $n['lu'] ? '<span class="badge badge-success">Lu</span>' : '<span class="badge badge-warning">Non lu</span>' ?></td>
-                    </tr>
-                    <?php endforeach; ?>
+                    <?php if (empty($notifications)): ?>
+                        <tr>
+                            <td colspan="5" class="text-center">Aucune notification pour le moment.</td>
+                        </tr>
+                    <?php else: ?>
+                        <?php foreach ($notifications as $n): ?>
+                        <tr class="<?= !$n['lu'] ? 'unread-row' : '' ?>" style="<?= !$n['lu'] ? 'background: rgba(17,17,17,0.02); font-weight: 500;' : '' ?>">
+                            <td>
+                                <?php if (!$n['lu']): ?>
+                                    <span style="display: inline-block; width: 8px; height: 8px; background: var(--primary); border-radius: 50%; margin-right: 8px;"></span>
+                                <?php endif; ?>
+                                <?= clean($n['titre']) ?>
+                            </td>
+                            <td><small><?= clean($n['contenu']) ?></small></td>
+                            <td><span class="badge badge-<?= $n['type'] ?>"><?= ucfirst($n['type']) ?></span></td>
+                            <td><?= formatDateTime($n['date_creation']) ?></td>
+                            <td>
+                                <?php if (!$n['lu']): ?>
+                                    <form action="notifications.php" method="POST" style="display: inline;">
+                                        <input type="hidden" name="mark_read" value="<?= $n['id'] ?>">
+                                        <button type="submit" class="btn btn-outline btn-sm">Marquer lu</button>
+                                    </form>
+                                <?php else: ?>
+                                    <span class="text-secondary text-sm">Déjà lu</span>
+                                <?php endif; ?>
+                            </td>
+                        </tr>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
                 </tbody>
             </table>
-        </div>
-
-        <!-- Modal Nouvelle Notification -->
-        <div id="notifModal" class="modal-overlay">
-            <div class="modal">
-                <h3>Envoyer une notification</h3>
-                <form action="notifications.php" method="POST">
-                    <div class="form-group">
-                        <label for="utilisateur_id">Destinataire</label>
-                        <select name="utilisateur_id" id="utilisateur_id" class="form-control" required>
-                            <?php foreach ($clients as $c): ?>
-                                <option value="<?= $c['id'] ?>"><?= clean($c['prenom'] . ' ' . $c['nom']) ?> (<?= $c['email'] ?>)</option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="titre">Titre</label>
-                        <input type="text" name="titre" id="titre" class="form-control" required placeholder="Ex: Rappel de réservation">
-                    </div>
-                    <div class="form-group">
-                        <label for="type">Type</label>
-                        <select name="type" id="type" class="form-control">
-                            <option value="info">Information</option>
-                            <option value="success">Succès</option>
-                            <option value="warning">Avertissement</option>
-                            <option value="error">Erreur</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="contenu">Message</label>
-                        <textarea name="contenu" id="contenu" class="form-control" rows="4" required></textarea>
-                    </div>
-                    <div class="modal-actions">
-                        <button type="button" class="btn btn-outline" onclick="document.getElementById('notifModal').style.display='none'">Annuler</button>
-                        <button type="submit" name="send_notif" class="btn btn-primary">Envoyer</button>
-                    </div>
-                </form>
-            </div>
         </div>
     </main>
 </body>

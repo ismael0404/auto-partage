@@ -24,6 +24,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // Paiement sur place
         $stmt = $pdo->prepare("UPDATE reservations SET mode_paiement = 'sur_place' WHERE id = :id");
         $stmt->execute([':id' => $id]);
+
+        // Notification pour l'admin
+        $admin_notif_stmt = $pdo->prepare("INSERT INTO messages (utilisateur_id, titre, contenu, type) VALUES (1, :titre, :contenu, 'warning')");
+        $admin_notif_stmt->execute([
+            ':titre' => "Mode de paiement : Sur Place",
+            ':contenu' => $_SESSION['user_prenom'] . " a choisi de payer sur place pour la réservation #" . $id . " (" . formatPrix($res['prix_total']) . ")."
+        ]);
+
         setFlash('success', "Mode de paiement 'sur place' enregistré. Vous pouvez télécharger votre reçu.");
         redirect('/client/reservations.php');
     }
@@ -41,6 +49,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($otp === '1212') {
             $stmt = $pdo->prepare("UPDATE reservations SET mode_paiement = 'ligne', statut_paiement = 'paye' WHERE id = :id");
             $stmt->execute([':id' => $id]);
+
+            // Notification pour l'admin
+            $admin_notif_stmt = $pdo->prepare("INSERT INTO messages (utilisateur_id, titre, contenu, type) VALUES (1, :titre, :contenu, 'success')");
+            $admin_notif_stmt->execute([
+                ':titre' => "Paiement en ligne réussi",
+                ':contenu' => $_SESSION['user_prenom'] . " a réglé " . formatPrix($res['prix_total']) . " en ligne pour la réservation #" . $id . "."
+            ]);
+
             setFlash('success', "Paiement effectué avec succès !");
             redirect('/client/reservations.php');
         } else {
