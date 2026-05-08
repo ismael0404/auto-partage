@@ -12,12 +12,17 @@ $featuredVehicles = $stmt->fetchAll();
 
 <section class="hero container" style="padding: 80px 0;">
     <div class="hero-content fade-in">
-        <div style="display: inline-block; padding: 8px 16px; background: rgba(0,0,0,0.05); border-radius: 50px; font-size: 0.8rem; font-weight: 700; margin-bottom: 24px; color: var(--primary); text-transform: uppercase; letter-spacing: 1px;">✨ Redéfinissez votre mobilité</div>
+        <div style="display: inline-block; padding: 8px 16px; background: rgba(0,0,0,0.05); border-radius: 50px; font-size: 0.8rem; font-weight: 700; margin-bottom: 24px; color: var(--primary); text-transform: uppercase; letter-spacing: 1px;">Redéfinissez votre mobilité</div>
         <h1 style="font-size: 3.5rem; margin-bottom: 20px;">Louez une voiture en toute simplicité</h1>
         <p style="font-size: 1.2rem; margin-bottom: 32px;">La meilleure plateforme d'autopartage rapide, sécurisée et économique. Profitez de nos tarifs compétitifs et de notre large gamme de véhicules.</p>
         <div class="hero-actions">
-            <a href="client/vehicles.php" class="btn btn-primary btn-lg" style="box-shadow: 0 10px 20px rgba(0,0,0,0.1);">Réserver maintenant</a>
-            <a href="client/vehicles.php" class="btn btn-outline btn-lg">Voir les véhicules</a>
+            <?php if (isAdmin()): ?>
+                <a href="admin/dashboard.php" class="btn btn-primary btn-lg" style="box-shadow: 0 10px 20px rgba(0,0,0,0.1);">Gérer la plateforme</a>
+                <a href="client/vehicles.php" class="btn btn-outline btn-lg">Voir le catalogue</a>
+            <?php else: ?>
+                <a href="client/vehicles.php" class="btn btn-primary btn-lg" style="box-shadow: 0 10px 20px rgba(0,0,0,0.1);">Réserver maintenant</a>
+                <a href="client/vehicles.php" class="btn btn-outline btn-lg">Voir les véhicules</a>
+            <?php endif; ?>
         </div>
         <div class="hero-stats mt-4 flex gap-4" style="margin-top: 48px;">
             <div class="flex items-center gap-1">

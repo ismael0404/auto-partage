@@ -86,22 +86,29 @@ sequenceDiagram
     U->>F: Sélectionne un véhicule et des dates
     F->>S: Requête POST (vehicule_id, date_debut, date_fin)
     
-    S->>B: Vérifie les conflits de dates (disponibilité)
-    B-->>S: Résultat (Disponible / Indisponible)
+    S->>S: Vérification du rôle (requireClient)
 
-    alt Véhicule Indisponible
-        S-->>F: Retourne erreur "Véhicule déjà loué pour ces dates"
-        F-->>U: Affiche l'indisponibilité
-    else Véhicule Disponible
-        S->>S: Calcul de la durée et du prix total
-        S->>B: INSERT INTO reservations (statut='en_attente', ...)
-        B-->>S: Confirmation ID Réservation
-        
-        S->>B: INSERT INTO messages (Notification Admin)
-        B-->>S: Message enregistré
-        
-        S-->>F: Redirection vers l'historique
-        F-->>U: Affiche "Réservation en attente de confirmation admin"
+    alt Utilisateur est Admin
+        S-->>F: Redirection vers Dashboard Admin
+        F-->>U: Accès refusé (Admin ne peut pas réserver)
+    else Utilisateur est Client
+        S->>B: Vérifie les conflits de dates (disponibilité)
+        B-->>S: Résultat (Disponible / Indisponible)
+
+        alt Véhicule Indisponible
+            S-->>F: Retourne erreur "Véhicule déjà loué"
+            F-->>U: Affiche l'indisponibilité
+        else Véhicule Disponible
+            S->>S: Calcul de la durée et du prix total
+            S->>B: INSERT INTO reservations (statut='en_attente', ...)
+            B-->>S: Confirmation ID Réservation
+            
+            S->>B: INSERT INTO messages (Notification Admin)
+            B-->>S: Message enregistré
+            
+            S-->>F: Redirection vers l'historique
+            F-->>U: Affiche "Réservation en attente"
+        end
     end
 ```
 

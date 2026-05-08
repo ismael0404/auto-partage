@@ -28,27 +28,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $statut = $_POST['statut'];
     $description = clean($_POST['description']);
     $caracteristiques = clean($_POST['caracteristiques']);
-    $image_name = isset($_POST['old_image']) ? $_POST['old_image'] : '';
 
-    // Gestion de l'upload d'image
-    if (isset($_FILES['image']) && $_FILES['image']['error'] === 0) {
-        $allowed = ['jpg', 'jpeg', 'png', 'webp', 'jfif'];
-        $filename = $_FILES['image']['name'];
-        $filetype = pathinfo($filename, PATHINFO_EXTENSION);
-        $filesize = $_FILES['image']['size'];
+    // Gestion de l'upload d'images (Principale + 3 Supplémentaires)
+    $images_data = [
+        'image' => isset($_POST['old_image']) ? $_POST['old_image'] : '',
+        'image2' => isset($_POST['old_image2']) ? $_POST['old_image2'] : '',
+        'image3' => isset($_POST['old_image3']) ? $_POST['old_image3'] : '',
+        'image4' => isset($_POST['old_image4']) ? $_POST['old_image4'] : '',
+    ];
 
-        if (!in_array(strtolower($filetype), $allowed)) {
-            $error = "Format d'image non autorisé (JPG, PNG, WEBP, JFIF uniquement).";
-        } elseif ($filesize > 5 * 1024 * 1024) { // 5MB
-            $error = "L'image est trop lourde (max 5Mo).";
-        } else {
-            $new_name = uniqid('veh_') . '.' . $filetype;
-            $upload_path = '../assets/images/vehicules/' . $new_name;
-            
-            if (move_uploaded_file($_FILES['image']['tmp_name'], $upload_path)) {
-                $image_name = $new_name;
-            } else {
-                $error = "Erreur lors de l'upload de l'image.";
+    $allowed = ['jpg', 'jpeg', 'png', 'webp', 'jfif'];
+
+    foreach (['image', 'image2', 'image3', 'image4'] as $img_key) {
+        if (isset($_FILES[$img_key]) && $_FILES[$img_key]['error'] === 0) {
+            $filename = $_FILES[$img_key]['name'];
+            $filetype = pathinfo($filename, PATHINFO_EXTENSION);
+            $filesize = $_FILES[$img_key]['size'];
+
+            if (in_array(strtolower($filetype), $allowed) && $filesize <= 5 * 1024 * 1024) {
+                $new_name = uniqid('veh_') . '_' . $img_key . '.' . $filetype;
+                $upload_path = '../assets/images/vehicules/' . $new_name;
+                if (move_uploaded_file($_FILES[$img_key]['tmp_name'], $upload_path)) {
+                    $images_data[$img_key] = $new_name;
+                }
             }
         }
     }
@@ -56,16 +58,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!$error) {
         if (isset($_POST['id']) && !empty($_POST['id'])) {
             // Update
-            $stmt = $pdo->prepare("UPDATE vehicules SET marque=:mq, modele=:md, annee=:an, type_carburant=:tc, transmission=:tr, nombre_places=:np, prix_jour=:pj, statut=:st, description=:ds, caracteristiques=:ct, image=:img WHERE id=:id");
+            $stmt = $pdo->prepare("UPDATE vehicules SET marque=:mq, modele=:md, annee=:an, type_carburant=:tc, transmission=:tr, nombre_places=:np, prix_jour=:pj, statut=:st, description=:ds, caracteristiques=:ct, image=:img, image2=:img2, image3=:img3, image4=:img4 WHERE id=:id");
             $stmt->execute([
-                ':mq' => $marque, ':md' => $modele, ':an' => $annee, ':tc' => $type_carburant, ':tr' => $transmission, ':np' => $nombre_places, ':pj' => $prix_jour, ':st' => $statut, ':ds' => $description, ':ct' => $caracteristiques, ':img' => $image_name, ':id' => $_POST['id']
+                ':mq' => $marque, ':md' => $modele, ':an' => $annee, ':tc' => $type_carburant, ':tr' => $transmission, ':np' => $nombre_places, ':pj' => $prix_jour, ':st' => $statut, ':ds' => $description, ':ct' => $caracteristiques, 
+                ':img' => $images_data['image'], ':img2' => $images_data['image2'], ':img3' => $images_data['image3'], ':img4' => $images_data['image4'],
+                ':id' => $_POST['id']
             ]);
             setFlash('success', "Véhicule mis à jour avec succès.");
         } else {
             // Insert
-            $stmt = $pdo->prepare("INSERT INTO vehicules (marque, modele, annee, type_carburant, transmission, nombre_places, prix_jour, statut, description, caracteristiques, image) VALUES (:mq, :md, :an, :tc, :tr, :np, :pj, :st, :ds, :ct, :img)");
+            $stmt = $pdo->prepare("INSERT INTO vehicules (marque, modele, annee, type_carburant, transmission, nombre_places, prix_jour, statut, description, caracteristiques, image, image2, image3, image4) VALUES (:mq, :md, :an, :tc, :tr, :np, :pj, :st, :ds, :ct, :img, :img2, :img3, :img4)");
             $stmt->execute([
-                ':mq' => $marque, ':md' => $modele, ':an' => $annee, ':tc' => $type_carburant, ':tr' => $transmission, ':np' => $nombre_places, ':pj' => $prix_jour, ':st' => $statut, ':ds' => $description, ':ct' => $caracteristiques, ':img' => $image_name
+                ':mq' => $marque, ':md' => $modele, ':an' => $annee, ':tc' => $type_carburant, ':tr' => $transmission, ':np' => $nombre_places, ':pj' => $prix_jour, ':st' => $statut, ':ds' => $description, ':ct' => $caracteristiques, 
+                ':img' => $images_data['image'], ':img2' => $images_data['image2'], ':img3' => $images_data['image3'], ':img4' => $images_data['image4']
             ]);
             setFlash('success', "Véhicule ajouté avec succès.");
         }
@@ -142,11 +147,14 @@ $pageTitle = "Gestion des véhicules";
 
     <!-- Modal Ajout/Modification -->
     <div id="vehicleModal" class="modal-overlay">
-        <div class="modal" style="max-width: 800px;">
-            <h3 id="modalTitle">Ajouter un véhicule</h3>
+        <div class="modal" style="max-width: 900px; padding: 40px; border-radius: 20px;">
+            <h3 id="modalTitle" style="font-size: 1.5rem; margin-bottom: 30px; border-bottom: 2px solid var(--bg-alt); padding-bottom: 15px;">Ajouter un véhicule</h3>
             <form action="vehicles.php" method="POST" enctype="multipart/form-data">
                 <input type="hidden" name="id" id="v_id">
                 <input type="hidden" name="old_image" id="v_old_image">
+                <input type="hidden" name="old_image2" id="v_old_image2">
+                <input type="hidden" name="old_image3" id="v_old_image3">
+                <input type="hidden" name="old_image4" id="v_old_image4">
                 <div class="grid-2">
                     <div class="form-group">
                         <label for="marque">Marque</label>
@@ -159,15 +167,29 @@ $pageTitle = "Gestion des véhicules";
                 </div>
                 <div class="grid-2">
                     <div class="form-group">
-                        <label for="image">Image du véhicule</label>
+                        <label for="image">Image principale</label>
                         <input type="file" name="image" id="v_image" class="form-control" accept="image/*">
                     </div>
+                    <div class="form-group">
+                        <label for="image2">Image 2 (Supplé.)</label>
+                        <input type="file" name="image2" id="v_image2" class="form-control" accept="image/*">
+                    </div>
+                </div>
+                <div class="grid-2">
+                    <div class="form-group">
+                        <label for="image3">Image 3 (Supplé.)</label>
+                        <input type="file" name="image3" id="v_image3" class="form-control" accept="image/*">
+                    </div>
+                    <div class="form-group">
+                        <label for="image4">Image 4 (Supplé.)</label>
+                        <input type="file" name="image4" id="v_image4" class="form-control" accept="image/*">
+                    </div>
+                </div>
+                <div class="grid-3">
                     <div class="form-group">
                         <label for="annee">Année</label>
                         <input type="number" name="annee" id="v_annee" class="form-control" required>
                     </div>
-                </div>
-                <div class="grid-2">
                     <div class="form-group">
                         <label for="type_carburant">Carburant</label>
                         <select name="type_carburant" id="v_carburant" class="form-control">
@@ -226,7 +248,13 @@ $pageTitle = "Gestion des véhicules";
             document.getElementById('modalTitle').textContent = "Ajouter un véhicule";
             document.getElementById('v_id').value = "";
             document.getElementById('v_old_image').value = "";
+            document.getElementById('v_old_image2').value = "";
+            document.getElementById('v_old_image3').value = "";
+            document.getElementById('v_old_image4').value = "";
             document.getElementById('v_image').value = "";
+            document.getElementById('v_image2').value = "";
+            document.getElementById('v_image3').value = "";
+            document.getElementById('v_image4').value = "";
             document.getElementById('v_marque').value = "";
             document.getElementById('v_modele').value = "";
             document.getElementById('v_annee').value = new Date().getFullYear();
@@ -244,8 +272,14 @@ $pageTitle = "Gestion des véhicules";
         function editVehicle(v) {
             document.getElementById('modalTitle').textContent = "Modifier le véhicule";
             document.getElementById('v_id').value = v.id;
-            document.getElementById('v_old_image').value = v.image;
+            document.getElementById('v_old_image').value = v.image || "";
+            document.getElementById('v_old_image2').value = v.image2 || "";
+            document.getElementById('v_old_image3').value = v.image3 || "";
+            document.getElementById('v_old_image4').value = v.image4 || "";
             document.getElementById('v_image').value = "";
+            document.getElementById('v_image2').value = "";
+            document.getElementById('v_image3').value = "";
+            document.getElementById('v_image4').value = "";
             document.getElementById('v_marque').value = v.marque;
             document.getElementById('v_modele').value = v.modele;
             document.getElementById('v_annee').value = v.annee;

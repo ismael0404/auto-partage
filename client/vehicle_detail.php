@@ -43,12 +43,18 @@ $pageTitle = $vehicle['marque'] . ' ' . $vehicle['modele'];
         <div class="detail-page">
             <div class="detail-grid">
                 <div class="detail-image">
-                    <img src="<?= getVehiculeImage($vehicle['image']) ?>" alt="<?= clean($vehicle['marque'] . ' ' . $vehicle['modele']) ?>">
+                    <img id="mainImage" src="<?= getVehiculeImage($vehicle['image']) ?>" alt="<?= clean($vehicle['marque'] . ' ' . $vehicle['modele']) ?>" style="width: 100%; height: 400px; object-fit: cover; border-radius: 12px; box-shadow: var(--shadow);">
                     <div class="grid-4 mt-2">
-                        <img src="<?= getVehiculeImage($vehicle['image']) ?>" style="height: 80px; object-fit: cover; border-radius: 4px;">
-                        <img src="<?= getVehiculeImage($vehicle['image']) ?>" style="height: 80px; object-fit: cover; border-radius: 4px; opacity: 0.6;">
-                        <img src="<?= getVehiculeImage($vehicle['image']) ?>" style="height: 80px; object-fit: cover; border-radius: 4px; opacity: 0.6;">
-                        <div style="height: 80px; background: #eee; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem;">+</div>
+                        <img src="<?= getVehiculeImage($vehicle['image']) ?>" class="thumbnail active" onclick="changeImage(this)" style="height: 80px; width: 100%; object-fit: cover; border-radius: 8px; cursor: pointer; border: 2px solid var(--primary);">
+                        <?php if ($vehicle['image2']): ?>
+                            <img src="<?= getVehiculeImage($vehicle['image2']) ?>" class="thumbnail" onclick="changeImage(this)" style="height: 80px; width: 100%; object-fit: cover; border-radius: 8px; cursor: pointer; border: 2px solid transparent;">
+                        <?php endif; ?>
+                        <?php if ($vehicle['image3']): ?>
+                            <img src="<?= getVehiculeImage($vehicle['image3']) ?>" class="thumbnail" onclick="changeImage(this)" style="height: 80px; width: 100%; object-fit: cover; border-radius: 8px; cursor: pointer; border: 2px solid transparent;">
+                        <?php endif; ?>
+                        <?php if ($vehicle['image4']): ?>
+                            <img src="<?= getVehiculeImage($vehicle['image4']) ?>" class="thumbnail" onclick="changeImage(this)" style="height: 80px; width: 100%; object-fit: cover; border-radius: 8px; cursor: pointer; border: 2px solid transparent;">
+                        <?php endif; ?>
                     </div>
                 </div>
                 <div class="detail-info">
@@ -71,7 +77,11 @@ $pageTitle = $vehicle['marque'] . ' ' . $vehicle['modele'];
 
                     <p class="mb-4" style="color: var(--secondary);"><?= nl2br(clean($vehicle['description'])) ?></p>
 
-                    <?php if ($vehicle['statut'] === 'disponible'): ?>
+                    <?php if (isAdmin()): ?>
+                        <div class="flash flash-info" style="margin-bottom: 0;">
+                            <i class="fas fa-info-circle"></i> En tant qu'administrateur, vous ne pouvez pas effectuer de réservation client.
+                        </div>
+                    <?php elseif ($vehicle['statut'] === 'disponible'): ?>
                         <a href="reserve.php?id=<?= $vehicle['id'] ?>" class="btn btn-primary btn-lg btn-block">Réserver maintenant</a>
                     <?php else: ?>
                         <button class="btn btn-primary btn-lg btn-block" disabled>Indisponible actuellement</button>
@@ -91,5 +101,15 @@ $pageTitle = $vehicle['marque'] . ' ' . $vehicle['modele'];
             </div>
         </div>
     </main>
+    <script>
+        function changeImage(el) {
+            document.getElementById('mainImage').src = el.src;
+            // Update active state
+            document.querySelectorAll('.thumbnail').forEach(thumb => {
+                thumb.style.borderColor = 'transparent';
+            });
+            el.style.borderColor = 'var(--primary)';
+        }
+    </script>
 </body>
 </html>
